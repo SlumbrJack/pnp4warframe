@@ -31,18 +31,89 @@ async def on_ready():
     channel = bot.get_channel(channel_id)
    
     await channel.purge(bulk = False)
-    news_Reset.start() 
+    #news_Reset.start() 
 
     async with aiosqlite.connect("main.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('CREATE TABLE IF NOT EXISTS buyorders (id INTEGER , item STRING, price INTEGER)')
+        await db.commit()
+#channels table
+    async with aiosqlite.connect("main.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('CREATE TABLE IF NOT EXISTS channels (guildID INTEGER , channelID INTEGER, channelUse STRING)')
         await db.commit()
 
     print("Hello! Study bot is ready!")
 
     await channel.send("Hello! Warframebot is ready!", silent = True)
 
+#START OF SETUP CODE
+#
+@bot.event
+async def on_guild_join(guild):
+    print("joined server")
+    channel =  guild.system_channel
+    await channel.send("Hello, I am in this server now")
 
+@bot.command()
+async def setup(ctx, auto):
+    guild = ctx.guild
+    category = await guild.create_category("WARFRAMEBOT")
+    print("starting setup")
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(send_messages=False)
+    }
+    async with aiosqlite.connect("main.db") as db:
+        async with db.cursor() as cursor:
+            channel = await guild.create_text_channel("warframe-news", overwrites = overwrites, category = category)
+            await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "news"))
+            channel = await guild.create_text_channel("warframe-alerts", overwrites = overwrites, category = category)
+            await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "alerts"))
+            channel = await guild.create_text_channel("warframe-events", overwrites = overwrites, category = category)
+            await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "events"))
+            channel = await guild.create_text_channel("warframe-invasions", overwrites = overwrites, category = category)
+            await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "invasions"))
+            channel = await guild.create_text_channel("warframe-cycles", overwrites = overwrites, category = category)
+            await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "cycles"))
+            channel = await guild.create_text_channel("warframe-market", category = category)
+            await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "market"))
+        await db.commit()
+
+
+
+@bot.command()
+async def testchannels(ctx):
+    async with aiosqlite.connect("main.db") as db:
+        async with db.cursor() as cursor:
+            for guild in bot.guilds:
+                await cursor.execute('SELECT channelID FROM channels WHERE channelUse = ? AND guildID = ?', ("invasions", guild.id))
+                data = await cursor.fetchall()
+                if data:
+                    for x in data:
+                        print(x[0])
+                        await guild.get_channel(x[0]).send("Invasions")
+                
+                await cursor.execute('SELECT channelID FROM channels WHERE channelUse = ? AND guildID = ?', ("alerts", guild.id))
+                data = await cursor.fetchall()
+                if data:
+                    for x in data:
+                        print(x[0])
+                        await guild.get_channel(x[0]).send("Alerts")
+
+                await cursor.execute('SELECT channelID FROM channels WHERE channelUse = ? AND guildID = ?', ("events", guild.id))
+                data = await cursor.fetchall()
+                if data:
+                    for x in data:
+                        print(x[0])
+                        await guild.get_channel(x[0]).send("events")
+
+        await db.commit()
+                    
+
+
+            
+           
+    
 
 @bot.command()
 async def addpurchase(ctx, item, price):
