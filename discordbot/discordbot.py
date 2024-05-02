@@ -31,7 +31,7 @@ async def on_ready():
     channel = bot.get_channel(channel_id)
    
     await channel.purge(bulk = False)
-    #news_Reset.start() 
+    
 
     async with aiosqlite.connect("main.db") as db:
         async with db.cursor() as cursor:
@@ -42,7 +42,16 @@ async def on_ready():
         async with db.cursor() as cursor:
             await cursor.execute('CREATE TABLE IF NOT EXISTS channels (guildID INTEGER , channelID INTEGER, channelUse STRING)')
         await db.commit()
-
+#news table
+    async with aiosqlite.connect("main.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('CREATE TABLE IF NOT EXISTS newsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, newsID STRING)')
+        await db.commit()
+#alerts table
+#events table
+#invasions table
+    news_Reset.start() 
+    clearOldNews.start()
     print("Hello! Study bot is ready!")
 
     await channel.send("Hello! Warframebot is ready!", silent = True)
@@ -110,6 +119,108 @@ async def testchannels(ctx):
         await db.commit()
                     
 
+@tasks.loop(minutes=2)
+async def news_Reset():
+    response = requests.get("https://api.warframestat.us/pc/news")
+    status = int(response.status_code)
+    channel = 0
+    if status == 200:
+
+        async with aiosqlite.connect("main.db") as db:
+            async with db.cursor() as cursor: 
+                for guild in bot.guilds:
+                    await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "news"))
+                    data = await cursor.fetchone()
+                    if data:
+                        for x in data:
+                            channel = data[0]
+                    await cursor.execute('SELECT newsID FROM newsMessages WHERE guildID = ?', (guild.id,))
+                    data = await cursor.fetchall()
+                    if data: #if there are news messages, go through all possible ones to find matches, if no match, post it
+                        for news in response.json():
+                            jsonNewsID = news["id"]
+                            matchFound = False
+                            for x in data:
+                                DBID = x[0] 
+                                if jsonNewsID == DBID:
+                                    matchFound = True
+                            if not matchFound:
+                                print("match not found")
+                                description = news["message"]
+                                link = news["link"]
+                                embed = discord.Embed(description=news["eta"],
+                                                    url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send')  # pretty sure these links are just placeholder
+                                embed.set_image(url=news["imageLink"])
+                                message = await guild.get_channel(channel).send(f"\n\n{description}\n{link}", embeds=[embed],silent=True)
+                                await cursor.execute('INSERT INTO newsMessages (guildID, channelID, messageID, newsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsonNewsID ))
+                        print("data found")
+                    #if there are no news messages in the guild, fill it
+                    else:
+                        print("no data")
+                        for news in response.json():
+                                newsID = news["id"]
+                                description = news["message"]
+                                link = news["link"]
+                                embed = discord.Embed(description=news["eta"],
+                                                    url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send')  # pretty sure these links are just placeholder
+                                embed.set_image(url=news["imageLink"])
+                                message = await guild.get_channel(channel).send(f"\n\n{description}\n{link}", embeds=[embed],silent=True)
+                                await cursor.execute('INSERT INTO newsMessages (guildID, channelID, messageID, newsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, newsID ))
+
+
+
+                           
+            await db.commit()
+
+@tasks.loop(hours = 24)
+async def clearOldNews():
+    channel = 0
+    response = requests.get("https://api.warframestat.us/pc/news")
+    status = int(response.status_code)
+    if status == 200:
+
+        async with aiosqlite.connect("main.db") as db:
+            async with db.cursor() as cursor: 
+                for guild in bot.guilds:
+                    await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "news"))
+                    data = await cursor.fetchone()
+                    if data:
+                        for x in data:
+                            channel = data[0]
+                await cursor.execute('SELECT newsID, messageID FROM newsMessages WHERE guildID = ?', (guild.id,))
+                data = await cursor.fetchall()
+                for x in data:
+                    matchFound = False
+                    DBID = x[0]
+
+                    for news in response.json():
+                        if news["id"] == DBID:
+                            matchFound = True
+                    if not matchFound:
+                        guild.get_channel(channel).fetch_message(x[1])
+                        await cursor.execute('DELETE FROM newsMessages WHERE newsID = ? AND messageID = ?', (DBID, x[1]))
+                        print("DELETED NEWS")
+            await db.commit()
+
+     
+                        
+    
+'''
+    #newsChannel = bot.get_channel(1234501703961808906)
+    await newsChannel.purge(bulk=False)
+    response = requests.get("https://api.warframestat.us/pc/news")
+    status = int(response.status_code)
+    if status == 200:
+        #for news in response.json():
+            news = response.json()[0]
+            description = news["message"]
+            link = news["link"]
+            embed = discord.Embed(description=news["eta"],
+                                   url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send')  # pretty sure these links are just placeholder
+            embed.set_image(url=news["imageLink"])
+            invasionMessages.append(
+                await newsChannel.send(f"\n\n{description}\n{link}", embeds=[embed],
+                               silent=True))'''
 
             
            
@@ -148,6 +259,14 @@ async def checkPrice(ctx, item):
                price = order["platinum"]
         await ctx.send(f"Lowest Price: {price} platinum")
 
+@bot.command()
+async def warframeInvasion2(ctx):
+    message = await bot.get_guild(1235283017002516561).get_channel(1235310956851232950).fetch_message(1235318783120375889)
+    await message.delete()
+
+@tasks.loop(minutes=5)
+async def warframeInvasion():
+    print("hi")
 
 @bot.command()
 async def warframeInvasion(ctx):
@@ -235,23 +354,6 @@ async def invasion_Reset():
     channel = bot.get_channel(channel_id)
     #await channel.send(f"**Take a break!** You've been studying for {max_session_time_minutes} minutes.")
     await warframeInvasion(channel)'''
-@tasks.loop(minutes=5)
-async def news_Reset():
-    newsChannel = bot.get_channel(1234501703961808906)
-    await newsChannel.purge(bulk=False)
-    response = requests.get("https://api.warframestat.us/pc/news")
-    status = int(response.status_code)
-    if status == 200:
-        #for news in response.json():
-            news = response.json()[0]
-            description = news["message"]
-            link = news["link"]
-            embed = discord.Embed(description=news["eta"],
-                                   url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send')  # pretty sure these links are just placeholder
-            embed.set_image(url=news["imageLink"])
-            invasionMessages.append(
-                await newsChannel.send(f"\n\n{description}\n{link}", embeds=[embed],
-                               silent=True))
 
 
 
