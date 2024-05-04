@@ -22,7 +22,10 @@ class Session:
     is_active: bool = False
     start_time: int = 0
  
-bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
+bot = commands.Bot(command_prefix="!", intents=discord.Intents.all() )
+
+
+
 session = Session()
 invasionMessages = []
 
@@ -32,10 +35,15 @@ async def on_ready():
    
     await channel.purge(bulk = False)
     
-
+#buy table
     async with aiosqlite.connect("main.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('CREATE TABLE IF NOT EXISTS buyorders (id INTEGER , item STRING, price INTEGER)')
+        await db.commit()
+#sell table
+    async with aiosqlite.connect("main.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('CREATE TABLE IF NOT EXISTS sellorders (id INTEGER , item STRING, price INTEGER)')
         await db.commit()
 #channels table
     async with aiosqlite.connect("main.db") as db:
@@ -52,6 +60,8 @@ async def on_ready():
 #invasions table
     news_Reset.start() 
     clearOldNews.start()
+    checkPurchaseOrders.start()
+    checkSellOrders.start()
     print("Hello! Study bot is ready!")
 
     await channel.send("Hello! Warframebot is ready!", silent = True)
@@ -62,18 +72,20 @@ async def on_ready():
 async def on_guild_join(guild):
     print("joined server")
     channel =  guild.system_channel
-    await channel.send("Hello, I am in this server now")
+    await channel.send("Hello, I am WarframeBot. Please type '!help' or '!setup auto' to get started")
 
-@bot.command()
+@bot.command(brief='Sets up the server by adding new channels', description='This command will add new channels under a new category to the server.\nWARNING: DO NO RUN THIS COMMAND MULTIPLE TIMES. DO NOT DELETE THISE CHANNELS WITHOUT USING THE CORRECT COMMAND')
 async def setup(ctx, auto):
     guild = ctx.guild
-    category = await guild.create_category("WARFRAMEBOT")
+    
     print("starting setup")
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(send_messages=False)
     }
     async with aiosqlite.connect("main.db") as db:
         async with db.cursor() as cursor:
+            category = await guild.create_category("WARFRAMEBOT")
+            await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, category.id, "header"))
             channel = await guild.create_text_channel("warframe-news", overwrites = overwrites, category = category)
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "news"))
             channel = await guild.create_text_channel("warframe-alerts", overwrites = overwrites, category = category)
@@ -87,9 +99,28 @@ async def setup(ctx, auto):
             channel = await guild.create_text_channel("warframe-market", category = category)
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "market"))
         await db.commit()
+    ctx.send("The server is now set up for WarframeBot. Please type !help to learn more")
 
+@bot.command(brief='Removes all channels created by the bot', description='This command will remove the channels and categories created by this bot\nOnce complete the bot will leave the server')
+async def removeBotFromServer(ctx):
+    async with aiosqlite.connect("main.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('SELECT channelID FROM channels WHERE guildID = ?', (ctx.guild.id,))
+            data = await cursor.fetchall()
+            if data:
+                for channel in data:
+                    await bot.get_channel(channel[0]).delete()
+                await cursor.execute('DELETE FROM channels WHERE guildID = ?', (ctx.guild.id,))
+            await cursor.execute('SELECT channelID FROM newsMessages where guildID = ?', (ctx.guild.id,))
+            data = await cursor.fetchall()
+            if data:
+                for message in data:
+                    await cursor.execute('DELETE FROM newsMessages where guildID = ?', (ctx.guild.id,))
+            await ctx.guild.leave()
+         
+        await db.commit()
 
-
+'''
 @bot.command()
 async def testchannels(ctx):
     async with aiosqlite.connect("main.db") as db:
@@ -118,8 +149,8 @@ async def testchannels(ctx):
 
         await db.commit()
                     
-
-@tasks.loop(minutes=2)
+'''
+@tasks.loop(hours=6)
 async def news_Reset():
     response = requests.get("https://api.warframestat.us/pc/news")
     status = int(response.status_code)
@@ -226,18 +257,117 @@ async def clearOldNews():
            
     
 
-@bot.command()
-async def addpurchase(ctx, item, price):
+@bot.command(brief= 'Adds an item to a purchase wishlist', description = 'Adds an item you would like to purchase to a wish list.\nWhen a sell order is placed on WarframeMarket for less than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addPurchase nezha_price_neuroptics 20')
+async def addPurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")): 
     async with aiosqlite.connect("main.db") as db:
         async with db.cursor() as cursor:
-            await cursor.execute('SELECT id FROM buyorders WHERE item = ?', (item.lower(),))
+            await cursor.execute('SELECT id FROM buyorders WHERE item = ? AND id = ?', (item.lower(), ctx.message.author.id))
             data = await cursor.fetchone()
             if data:
-                await cursor.execute('INSERT INTO buyorders (id, item, price) VALUES (?,?,?)', (ctx.message.author.id, item.lower(), price))
+                print("you have already wishlisted this item")
             else:
                 await cursor.execute('INSERT INTO buyorders (id, item, price) VALUES (?,?,?)', (ctx.message.author.id, item.lower(), price))
         await db.commit()
 
+@bot.command(brief= 'Removes an item from the purchase wishlist', description= 'Removes an item from your purchase wishlist.\nYou will no longer receive messages about this item. Example usage: !removePurchase nidus_prime_chassis') 
+async def removePurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems")):
+    async with aiosqlite.connect("main.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('DELETE FROM buyorders WHERE item = ? AND id = ?',  (item.lower(), ctx.message.author.id))
+        await db.commit()
+
+@bot.command(brief= 'Adds an item to a sell wishlist', description = 'Adds an item you would like to sell to a wish list.\nWhen a buy order is placed on WarframeMarket for more than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addSale nezha_price_neuroptics 10')
+async def addSale(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")):
+    async with aiosqlite.connect("main.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('SELECT id FROM sellorders WHERE item = ? AND id = ?', (item.lower(), ctx.message.author.id))
+            data = await cursor.fetchone()
+            if data:
+                print("you have already wishlisted this item")
+            else:
+                await cursor.execute('INSERT INTO sellorders (id, item, price) VALUES (?,?,?)', (ctx.message.author.id, item.lower(), price))
+        await db.commit()
+
+@bot.command(brief= 'Removes an item from the sell wishlist', description= 'Removes an item from your sale wishlist.\nYou will no longer receive messages about this item. Example usage: !removeSale nidus_prime_chassis')
+async def removeSale(ctx, item):
+    async with aiosqlite.connect("main.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('DELETE FROM sellorders WHERE item = ? AND id = ?',  (item.lower(), ctx.message.author.id))
+        await db.commit()
+
+@tasks.loop(minutes = 16)
+async def checkPurchaseOrders():
+    if checkPurchaseOrders.current_loop ==0:
+        return
+    #for every row in buy orders
+    #check api if buy order price is less than sale api price
+    async with aiosqlite.connect("main.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('SELECT * FROM buyorders')
+            data = await cursor.fetchall()
+            if data:
+                for order in data:
+                    userID = order[0]
+                    item = order[1]
+                    price = order[2]
+                    loopInt = 0
+                    print(userID, item, price)
+                    response = requests.get(f"https://api.warframe.market/v1/items/{item}/orders")
+                    status = int(response.status_code)
+                    if status == 200:
+                        APIorder = response.json()["payload"]["orders"]
+                        for x in reversed(APIorder):
+                            loopInt += 1
+                            if x["visible"] == True and x["order_type"] == "sell" and x["platinum"] <= price:
+                                channel = await bot.get_user(userID).create_dm()
+                                await channel.send("The item you wishlisted: " + item + " is on sale for your asking price (or less!)")
+                                print("looped " + str(loopInt) + " times")
+                                break
+            await db.commit()
+
+@tasks.loop(minutes = 15)
+async def checkSellOrders():
+    if checkSellOrders.current_loop ==0:
+        return
+    #for every row in buy orders
+    #check api if buy order price is less than sale api price
+    async with aiosqlite.connect("main.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('SELECT * FROM sellorders')
+            data = await cursor.fetchall()
+            if data:
+                for order in data:
+                    userID = order[0]
+                    item = order[1]
+                    price = order[2]
+                    loopInt = 0
+                    print(userID, item, price)
+                    response = requests.get(f"https://api.warframe.market/v1/items/{item}/orders")
+                    status = int(response.status_code)
+                    if status == 200:
+                        APIorder = response.json()["payload"]["orders"]
+                        for x in reversed(APIorder):
+                            loopInt += 1
+                            if x["visible"] == True and x["order_type"] == "buy" and x["platinum"] >= price:
+                                channel = await bot.get_user(userID).create_dm()
+                                await channel.send("The item you wishlisted: " + item + " is being requested for your asking price (or more!)")
+                                print("looped " + str(loopInt) + " times")
+                                break
+            await db.commit()
+                    
+'''
+@bot.command
+async def help(ctx, specific = "default"):
+    if(specific == "default"):
+        helpMessage = "Welcome to Warframe Bot!\nHere's some information on how this bot works:\nThrough the !setup command, I created several channels you can find information in.\n"
+        helpMessage2 = "Most of these channels are automatically updating channels that will post live information about what is going on in warframe. Some information about these:\n"
+        helpMessage3 = "News - Contains updated information about updates, hotfixes, Prime Times, and more!\n\nAlerts, Events, and Invasions - These channels contain information on the active missions in their respectice categories and includes the locations, rewards, and necessary details about each\n\n"
+        helpMessage4 = "Cycles - This channel contains the current cycle for open world zones\n\nMarket - This channel is available to make wishlist requests to Warframe Market. Type !help market to learn more!"
+        ctx.send(helpMessage + helpMessage2 + helpMessage3 + helpMessage4)
+    elif specific == "market":
+        marketHelp1 = "market yay"
+        ctx.send(marketHelp1)
+'''
 
 @bot.event
 async def on_reaction_add(genreaction, user):
@@ -246,19 +376,31 @@ async def on_reaction_add(genreaction, user):
     emoji = str(genreaction)
     await channel.send(f"Thanks for the reaction! {emoji}")
 
+'''
 @bot.command()
 async def checkPrice(ctx, item):
     price = 5000
     response = requests.get(f"https://api.warframe.market/v1/items/{item}/orders")
     status = int(response.status_code)
     if status == 200:
+        #size = len(response.json()["payload"]["orders"]) - 1
+        response = response.json()["payload"]["orders"]
+        for order in reversed(response):
+            if order["order_type"] == "buy":
+                print(order["platinum"])
+                break
+
         #for order in response.json()["payload"]["orders"]:
+        '''
+'''
         for x in range(51):
            order = response.json()["payload"]["orders"][x]
            if order["platinum"] < price:
                price = order["platinum"]
         await ctx.send(f"Lowest Price: {price} platinum")
+        '''
 
+'''
 @bot.command()
 async def warframeInvasion2(ctx):
     message = await bot.get_guild(1235283017002516561).get_channel(1235310956851232950).fetch_message(1235318783120375889)
@@ -346,7 +488,8 @@ async def warframeSnapshot(ctx):
     status = int(response.status_code)
    # if status == 200:
 
-'''                  
+'''        
+'''          
 @tasks.loop(minutes=max_session_time_minutes)
 async def invasion_Reset():
     if invasion_Reset.current_loop == 0:
@@ -357,7 +500,7 @@ async def invasion_Reset():
 
 
 
-
+'''
 @bot.command()
 async def photoSendTest(ctx):
     response = requests.get("https://api.warframestat.us/pc/invasions")
@@ -367,7 +510,7 @@ async def photoSendTest(ctx):
         if mission["completed"] != True:
              attackreward = mission["attackerReward"]["thumbnail"]
              await ctx.send(file=discord.File(attackreward))
-
+'''
 
 """
 @bot.event
