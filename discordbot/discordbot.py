@@ -31,28 +31,27 @@ invasionMessages = []
 
 @bot.event
 async def on_ready():
-    channel = bot.get_channel(channel_id)
-   
-    await channel.purge(bulk = False)
+    #channel = bot.get_channel(channel_id)
+   # await channel.purge(bulk = False)
     
 #buy table
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             #await cursor.execute('DROP TABLE buyorders')
             await cursor.execute('CREATE TABLE IF NOT EXISTS buyorders (id INTEGER , item STRING, price INTEGER)')
         await db.commit()
 #sell table
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('CREATE TABLE IF NOT EXISTS sellorders (id INTEGER , item STRING, price INTEGER)')
         await db.commit()
 #channels table
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('CREATE TABLE IF NOT EXISTS channels (guildID INTEGER , channelID INTEGER, channelUse STRING)')
         await db.commit()
 #news table
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('CREATE TABLE IF NOT EXISTS newsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, newsID STRING)')
         await db.commit()
@@ -63,9 +62,8 @@ async def on_ready():
     clearOldNews.start()
     checkPurchaseOrders.start()
     checkSellOrders.start()
-    print("Hello! Study bot is ready!")
 
-    await channel.send("Hello! Warframebot is ready!", silent = True)
+    #await channel.send("Hello! Warframebot is ready!", silent = True)
 
 #START OF SETUP CODE
 #
@@ -75,15 +73,20 @@ async def on_guild_join(guild):
     channel =  guild.system_channel
     await channel.send("Hello, I am WarframeBot. Please type '!setup' to get started.")
 
+@bot.command()
+async def ping(ctx):
+    await ctx.sent("Pong!")
+
 @bot.command(brief='Sets up the server by adding new channels', description='This command will add new channels under a new category to the server.\nWARNING: DO NO RUN THIS COMMAND MULTIPLE TIMES. DO NOT DELETE THISE CHANNELS WITHOUT USING THE CORRECT COMMAND')
 async def setup(ctx):
     guild = ctx.guild
+    print(guild.id)
     
     print("starting setup")
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(send_messages=False)
     }
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             category = await guild.create_category("WARFRAMEBOT")
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, category.id, "header"))
@@ -105,7 +108,7 @@ async def setup(ctx):
 
 @bot.command(brief='Removes all channels created by the bot', description='This command will remove the channels and categories created by this bot\nOnce complete the bot will leave the server')
 async def removeBotFromServer(ctx):
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('SELECT channelID FROM channels WHERE guildID = ?', (ctx.guild.id,))
             data = await cursor.fetchall()
@@ -125,7 +128,7 @@ async def removeBotFromServer(ctx):
 '''
 @bot.command()
 async def testchannels(ctx):
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             for guild in bot.guilds:
                 await cursor.execute('SELECT channelID FROM channels WHERE channelUse = ? AND guildID = ?', ("invasions", guild.id))
@@ -159,14 +162,19 @@ async def news_Reset():
     channel = 0
     if status == 200:
 
-        async with aiosqlite.connect("main.db") as db:
+        async with aiosqlite.connect("main2.db") as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
+                    print(bot.guilds)
                     await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "news"))
                     data = await cursor.fetchone()
                     if data:
                         for x in data:
                             channel = data[0]
+                            print(channel)
+                    else:
+                        print("ERROR BREAK 174")
+
                     await cursor.execute('SELECT newsID FROM newsMessages WHERE guildID = ?', (guild.id,))
                     data = await cursor.fetchall()
                     if data: #if there are news messages, go through all possible ones to find matches, if no match, post it
@@ -184,6 +192,7 @@ async def news_Reset():
                                 embed = discord.Embed(description=news["eta"],
                                                     url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send')  # pretty sure these links are just placeholder
                                 embed.set_image(url=news["imageLink"])
+                                
                                 message = await guild.get_channel(channel).send(f"\n\n{description}\n{link}", embeds=[embed],silent=True)
                                 await cursor.execute('INSERT INTO newsMessages (guildID, channelID, messageID, newsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsonNewsID ))
                         print("data found")
@@ -197,6 +206,7 @@ async def news_Reset():
                                 embed = discord.Embed(description=news["eta"],
                                                     url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send')  # pretty sure these links are just placeholder
                                 embed.set_image(url=news["imageLink"])
+                              
                                 message = await guild.get_channel(channel).send(f"\n\n{description}\n{link}", embeds=[embed],silent=True)
                                 await cursor.execute('INSERT INTO newsMessages (guildID, channelID, messageID, newsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, newsID ))
 
@@ -212,7 +222,7 @@ async def clearOldNews():
     status = int(response.status_code)
     if status == 200:
 
-        async with aiosqlite.connect("main.db") as db:
+        async with aiosqlite.connect("main2.db") as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
                     await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "news"))
@@ -268,7 +278,7 @@ async def addPurchase(ctx, item = commands.parameter(description="Must be repres
     if not price.isdigit():
         await ctx.send("There was an error using that command, use \"!help (the command you are trying to use)\" to learn more!")
     else:
-        async with aiosqlite.connect("main.db") as db:
+        async with aiosqlite.connect("main2.db") as db:
             async with db.cursor() as cursor:
                 await cursor.execute('SELECT id FROM buyorders WHERE item = ? AND id = ?', (item.lower(), ctx.message.author.id))
                 data = await cursor.fetchone()
@@ -281,7 +291,7 @@ async def addPurchase(ctx, item = commands.parameter(description="Must be repres
 
 @bot.command(brief= 'Removes an item from the purchase wishlist', description= 'Removes an item from your purchase wishlist.\nYou will no longer receive messages about this item. Example usage: !removePurchase nidus_prime_chassis') 
 async def removePurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems")):
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('DELETE FROM buyorders WHERE item = ? AND id = ?',  (item.lower(), ctx.message.author.id))
             await ctx.send("You have removed " + item + " from your purchase wishlist")
@@ -289,7 +299,7 @@ async def removePurchase(ctx, item = commands.parameter(description="Must be rep
 
 @bot.command(brief= 'Adds an item to a sell wishlist', description = 'Adds an item you would like to sell to a wish list.\nWhen a buy order is placed on WarframeMarket for more than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addSale nezha_price_neuroptics 10')
 async def addSale(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")):
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('SELECT id FROM sellorders WHERE item = ? AND id = ?', (item.lower(), ctx.message.author.id))
             data = await cursor.fetchone()
@@ -302,7 +312,7 @@ async def addSale(ctx, item = commands.parameter(description="Must be represente
 
 @bot.command(brief= 'Removes an item from the sell wishlist', description= 'Removes an item from your sale wishlist.\nYou will no longer receive messages about this item. Example usage: !removeSale nidus_prime_chassis')
 async def removeSale(ctx, item):
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('DELETE FROM sellorders WHERE item = ? AND id = ?',  (item.lower(), ctx.message.author.id))
             await ctx.send("You have removed " + item + " from your sell wishlist")
@@ -311,7 +321,7 @@ async def removeSale(ctx, item):
 @bot.command(brief="Shows a list of your wishlisted items", description="Shows a list of your purchase and sell wishlisted items.")
 async def wishlist(ctx):
     message = ""
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('SELECT item FROM buyorders WHERE id = ?', (ctx.author.id,))
             data = await cursor.fetchall()
@@ -333,7 +343,7 @@ async def checkPurchaseOrders():
         return
     #for every row in buy orders
     #check api if buy order price is less than sale api price
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('SELECT * FROM buyorders')
             data = await cursor.fetchall()
@@ -363,7 +373,7 @@ async def checkSellOrders():
         return
     #for every row in buy orders
     #check api if buy order price is less than sale api price
-    async with aiosqlite.connect("main.db") as db:
+    async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('SELECT * FROM sellorders')
             data = await cursor.fetchall()
@@ -532,7 +542,7 @@ async def invasion_Reset():
 
 
 
-'''
+
 @bot.command()
 async def photoSendTest(ctx):
     response = requests.get("https://api.warframestat.us/pc/invasions")
@@ -540,9 +550,9 @@ async def photoSendTest(ctx):
     if status == 200:
         mission = response.json()[0]
         if mission["completed"] != True:
-             attackreward = mission["attackerReward"]["thumbnail"]
+             attackreward = mission["attacker"]["reward"]["thumbnail"]
              await ctx.send(file=discord.File(attackreward))
-'''
+
 
 """
 @bot.event
