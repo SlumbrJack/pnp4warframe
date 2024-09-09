@@ -607,14 +607,39 @@ async def clearOldEvents():
      
                         
 
-            
-           
+@bot.command(brief='Lists cycles for open zones', description= 'Lists the current cycles for Cetus, Orb Vallis, and Cambion Drift')
+async def cycles(ctx):
+    response = requests.get("https://api.warframestat.us/pc/cetusCycle")
+    status = int(response.status_code)
+    if status == 200:
+        cycleStatus = response.json()["state"]
+        timeLeft = response.json()["shortString"]
+        print(1)
+        await ctx.send("It is currently: " + cycleStatus + "\n" + timeLeft)
+        print(2)
+
+    response = requests.get("https://api.warframestat.us/pc/vallisCycle")
+    status = int(response.status_code)
+    if status == 200:
+        cycleStatus = response.json()["state"]
+        timeLeft = response.json()["shortString"]
+        await ctx.send("It is currently: " + cycleStatus + "\n" + timeLeft)
+
+    response = requests.get("https://api.warframestat.us/pc/cambionCycle")
+    status = int(response.status_code)
+    if status == 200:
+        cycleStatus = response.json()["state"]
+        timeLeft = response.json()["timeLeft"]
+        await ctx.send("It is currently: " + cycleStatus + "\nTime Remaining: " + timeLeft)
+
+
+'''
 @bot.event
 async def on_command_error(ctx,error):
     if isinstance(error, commands.CommandError):
         
         await ctx.send("There was an error using that command, use \"!help (the command you are trying to use)\" to learn more!")    
-
+'''
 @bot.command(brief= 'Adds an item to a purchase wishlist', description = 'Adds an item you would like to purchase to a wish list.\nWhen a sell order is placed on WarframeMarket for less than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addPurchase nezha_price_neuroptics 20')
 async def addPurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")): 
     if not price.isdigit():
