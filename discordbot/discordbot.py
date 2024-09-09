@@ -33,55 +33,65 @@ invasionMessages = []
 async def on_ready():
     #channel = bot.get_channel(channel_id)
    # await channel.purge(bulk = False)
-    
+    async with aiosqlite.connect("main2.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('SELECT guildID FROM channels',)
+            data = await cursor.fetchall()
+            await db.commit()
+            if data:
 #buy table
-    async with aiosqlite.connect("main2.db") as db:
-        async with db.cursor() as cursor:
-            #await cursor.execute('DROP TABLE buyorders')
-            await cursor.execute('CREATE TABLE IF NOT EXISTS buyorders (id INTEGER , item STRING, price INTEGER)')
-            print("Table Created")
-        await db.commit()
-#sell table
-    async with aiosqlite.connect("main2.db") as db:
-        async with db.cursor() as cursor:
-            await cursor.execute('CREATE TABLE IF NOT EXISTS sellorders (id INTEGER , item STRING, price INTEGER)')
-        await db.commit()
-#channels table
-    async with aiosqlite.connect("main2.db") as db:
-        async with db.cursor() as cursor:
-            await cursor.execute('CREATE TABLE IF NOT EXISTS channels (guildID INTEGER , channelID INTEGER, channelUse STRING)')
-        await db.commit()
-#news table
-    async with aiosqlite.connect("main2.db") as db:
-        async with db.cursor() as cursor:
-            await cursor.execute('CREATE TABLE IF NOT EXISTS newsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, newsID STRING)')
-        await db.commit()
-#alerts table
-    async with aiosqlite.connect("main2.db") as db:
-        async with db.cursor() as cursor:
-            await cursor.execute('CREATE TABLE IF NOT EXISTS alertsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, alertsID STRING)')
-        await db.commit()
-#events table
-    async with aiosqlite.connect("main2.db") as db:
-        async with db.cursor() as cursor:
-            await cursor.execute('CREATE TABLE IF NOT EXISTS eventsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, eventsID STRING)')
-        await db.commit()
-#invasions table
-    async with aiosqlite.connect("main2.db") as db:
-        async with db.cursor() as cursor:
-            await cursor.execute('CREATE TABLE IF NOT EXISTS invasionsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, invasionsID STRING)')
-        await db.commit()
-    news_Reset.start() 
-    clearOldNews.start()
-    alerts_Reset.start()
-    clearOldAlerts.start()
-    invasions_Reset.start()
-    clearOldInvasions.start()
-    events_Reset.start()
-    clearOldEvents.start()
+                async with aiosqlite.connect("main2.db") as db:
+                    async with db.cursor() as cursor:
+                        #await cursor.execute('DROP TABLE buyorders')
+                        await cursor.execute('CREATE TABLE IF NOT EXISTS buyorders (id INTEGER , item STRING, price INTEGER)')
+                        print("Table Created")
+                    await db.commit()
+            #sell table
+                async with aiosqlite.connect("main2.db") as db:
+                    async with db.cursor() as cursor:
+                        await cursor.execute('CREATE TABLE IF NOT EXISTS sellorders (id INTEGER , item STRING, price INTEGER)')
+                    await db.commit()
+            #channels table
+                async with aiosqlite.connect("main2.db") as db:
+                    async with db.cursor() as cursor:
+                        #await cursor.execute('DROP TABLE channels')
+                        await cursor.execute('CREATE TABLE IF NOT EXISTS channels (guildID INTEGER , channelID INTEGER, channelUse STRING)')
+                    await db.commit()
+            #news table
+                async with aiosqlite.connect("main2.db") as db:
+                    async with db.cursor() as cursor:
+                        #await cursor.execute('DROP TABLE newsMessages')
+                        await cursor.execute('CREATE TABLE IF NOT EXISTS newsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, newsID STRING)')
+                    await db.commit()
+            #alerts table
+                async with aiosqlite.connect("main2.db") as db:
+                    async with db.cursor() as cursor:
+                        #await cursor.execute('DROP TABLE alertsMessages')
+                        await cursor.execute('CREATE TABLE IF NOT EXISTS alertsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, alertsID STRING)')
+                    await db.commit()
+            #events table
+                async with aiosqlite.connect("main2.db") as db:
+                    async with db.cursor() as cursor:
+                        #await cursor.execute('DROP TABLE eventsMessages')
+                        await cursor.execute('CREATE TABLE IF NOT EXISTS eventsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, eventsID STRING)')
+                    await db.commit()
+            #invasions table
+                async with aiosqlite.connect("main2.db") as db:
+                    async with db.cursor() as cursor:
+                        #await cursor.execute('DROP TABLE invasionsMessages')
+                        await cursor.execute('CREATE TABLE IF NOT EXISTS invasionsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, invasionsID STRING)')
+                    await db.commit()
+                news_Reset.start() 
+                clearOldNews.start()
+                alerts_Reset.start()
+                clearOldAlerts.start()
+                invasions_Reset.start()
+                clearOldInvasions.start()
+                events_Reset.start()
+                clearOldEvents.start()
 
-    checkPurchaseOrders.start()
-    checkSellOrders.start()
+                checkPurchaseOrders.start()
+                checkSellOrders.start()
 
     #await channel.send("Hello! Warframebot is ready!", silent = True)
 
@@ -108,7 +118,9 @@ async def setup(ctx):
     }
     async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
+            
             category = await guild.create_category("WARFRAMEBOT")
+            #await cursor.execute('DROP TABLE channels')
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, category.id, "header"))
             channel = await guild.create_text_channel("warframe-news", overwrites = overwrites, category = category)
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "news"))
@@ -122,11 +134,15 @@ async def setup(ctx):
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "cycles"))
             channel = await guild.create_text_channel("warframe-market", category = category)
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "market"))
+            await cursor.execute('DELETE FROM newsMessages where guildID = ?', (ctx.guild.id,))
+            await cursor.execute('DELETE FROM alertsMessages where guildID = ?', (ctx.guild.id,))
+            await cursor.execute('DELETE FROM invasionsMessages where guildID = ?', (ctx.guild.id,))
+            await cursor.execute('DELETE FROM eventsMessages where guildID = ?', (ctx.guild.id,))
         await db.commit()
-        news_Reset.restart()
-        alerts_Reset.restart()
-        invasions_Reset.restart()
-        events_Reset.restart()
+        news_Reset.start()
+        alerts_Reset.start()
+        invasions_Reset.start()
+        events_Reset.start()
     await ctx.send("The server is now set up for WarframeBot. Please type !help to learn more. Type \"!help (command name)\" to learn more about a specific command")
 
 @bot.command(brief='Removes all channels created by the bot', description='This command will remove the channels and categories created by this bot\nOnce complete the bot will leave the server')
@@ -143,15 +159,24 @@ async def removeBotFromServer(ctx):
             await cursor.execute('SELECT channelID FROM newsMessages where guildID = ?', (ctx.guild.id,))
             data = await cursor.fetchall()
             if data:
-                for message in data:
-                    await cursor.execute('DELETE FROM newsMessages where guildID = ?', (ctx.guild.id,))
+                await cursor.execute('DELETE FROM newsMessages where guildID = ?', (ctx.guild.id,))
+
             await cursor.execute('SELECT channelID FROM alertsMessages where guildID = ?', (ctx.guild.id,))
             data = await cursor.fetchall()
             if data:
-                for message in data:
-                    await cursor.execute('DELETE FROM alertsMessages where guildID = ?', (ctx.guild.id,))
-            await ctx.guild.leave()
+                await cursor.execute('DELETE FROM alertsMessages where guildID = ?', (ctx.guild.id,))
+
+            await cursor.execute('SELECT channelID FROM eventsMessages where guildID = ?', (ctx.guild.id,))
+            data = await cursor.fetchall()
+            if data:
+                await cursor.execute('DELETE FROM eventsMessages where guildID = ?', (ctx.guild.id,))
+            
          
+            await cursor.execute('SELECT channelID FROM invasionsMessages where guildID = ?', (ctx.guild.id,))
+            data = await cursor.fetchall()
+            if data:
+                await cursor.execute('DELETE FROM invasionsMessages where guildID = ?', (ctx.guild.id,))
+            await ctx.guild.leave()
         await db.commit()
 
 
@@ -470,8 +495,9 @@ async def events_Reset():
                         print("data found")
                     #if there are no news messages in the guild, fill it
                     else:
-                        print("no data")
+                        print("no data:events")
                         for events in response.json():
+                                print("no data:event2")
                                 jsoneventsID = events["id"]
                            
                                 description = "Event: " + events["description"] + " - " + events["tooltip"] + "\nLocation: " + events["node"] + "\nReward: " + events["rewards"][0]["asString"] + "\nEnds: " + events["expiry"]
