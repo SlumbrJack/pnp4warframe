@@ -632,6 +632,20 @@ async def cycles(ctx):
         timeLeft = response.json()["timeLeft"]
         await ctx.send("It is currently: " + cycleStatus + "\nTime Remaining: " + timeLeft)
 
+@bot.command(brief='Information on the Void Trader', description='')
+async def baro(ctx):
+    response = requests.get("https://api.warframestat.us/pc/voidTrader")
+    status = int(response.status_code)
+    if status == 200:
+        bActive = response.json()["active"]
+        location = response.json()["location"]
+        arrives = response.json()["startString"]
+        leaves = response.json()["endString"]
+        if(bActive):
+            await ctx.send("Baro is currently at " + location +" and will leave in " + leaves)
+        else:
+            await ctx.send("Baro will arrive at " + location +" in " + arrives)
+
 
 '''
 @bot.event
