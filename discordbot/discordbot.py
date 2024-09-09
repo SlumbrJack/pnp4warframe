@@ -62,11 +62,24 @@ async def on_ready():
             await cursor.execute('CREATE TABLE IF NOT EXISTS alertsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, alertsID STRING)')
         await db.commit()
 #events table
+    async with aiosqlite.connect("main2.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('CREATE TABLE IF NOT EXISTS eventsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, eventsID STRING)')
+        await db.commit()
 #invasions table
+    async with aiosqlite.connect("main2.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('CREATE TABLE IF NOT EXISTS invasionsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, invasionsID STRING)')
+        await db.commit()
     news_Reset.start() 
     clearOldNews.start()
     alerts_Reset.start()
     clearOldAlerts.start()
+    invasions_Reset.start()
+    clearOldInvasions.start()
+    events_Reset.start()
+    clearOldEvents.start()
+
     checkPurchaseOrders.start()
     checkSellOrders.start()
 
@@ -112,6 +125,8 @@ async def setup(ctx):
         await db.commit()
         news_Reset.restart()
         alerts_Reset.restart()
+        invasions_Reset.restart()
+        events_Reset.restart()
     await ctx.send("The server is now set up for WarframeBot. Please type !help to learn more. Type \"!help (command name)\" to learn more about a specific command")
 
 @bot.command(brief='Removes all channels created by the bot', description='This command will remove the channels and categories created by this bot\nOnce complete the bot will leave the server')
@@ -246,6 +261,228 @@ async def alerts_Reset():
                            
             await db.commit()
 
+@tasks.loop(hours=6)
+async def invasions_Reset():
+    response = requests.get("https://api.warframestat.us/pc/invasions")
+    status = int(response.status_code)
+    print(status)
+    if status == 200:
+        totalmessage = ""
+        async with aiosqlite.connect("main2.db") as db:
+            async with db.cursor() as cursor: 
+                for guild in bot.guilds:
+                    await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "invasions"))
+                    data = await cursor.fetchone()
+                    if data:
+                        for x in data:
+                            print(data)
+                            channel = data[0]
+                    await cursor.execute('SELECT invasionsID FROM invasionsMessages WHERE guildID = ?', (guild.id,))
+                    data = await cursor.fetchall()
+                    print(data)
+                    if data: #if there are invasions, go through all possible ones to find matches, if no match, post it
+                        matchFound = False
+                        for mission in response.json():
+                            jsonAlertsID = mission["id"]
+                            matchFound = False
+                            for x in data:
+                                DBID = x[0] 
+                                if jsonAlertsID == DBID:
+                                    matchFound = True
+                            if not matchFound:
+                                if mission["completed"] != True:
+                                    if "reward" in mission["attacker"]:
+                                        print(mission["attacker"]["reward"]["asString"])
+                                        attackreward = mission["attacker"]["reward"]["asString"]
+                                        embed1 = discord.Embed(description=f"Attacker Reward: {attackreward}",
+                                                            url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send') #pretty sure these links are just placeholder
+                                        embed1.set_image(url=mission["attacker"]["reward"]["thumbnail"])
+
+                                    if "reward" in mission["defender"]:
+                                        defendreward = mission["defender"]["reward"]["asString"]
+                                        embed2 = discord.Embed(description=f"Defender Reward: {defendreward}",
+                                                            url='https://old.discordjs.dev/#/docs/discord.js/14.14.1/class/EmbedBuilder')
+                                        embed2.set_image(url=mission["defender"]["reward"]["thumbnail"])
+
+                                    location = mission["node"]
+                                    description = mission["desc"]
+                                    if attackreward != "":
+                                        print("runningmission")
+                                        invasionMessages.append( await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embeds = [embed1, embed2], silent=True))
+                                    else:
+                                        print("runningmission2")
+                                        invasionMessages.append(await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embed = embed2, silent=True))
+                                    attackreward = ""
+                                    defendreward = ""
+                                    embed1.clear_fields()
+                                    embed2.clear_fields()
+                    else:
+                        for mission in response.json(): 
+                            jsoninvasionsID = mission["id"]
+                            if mission["completed"] != True:
+                                if "reward" in mission["attacker"]:
+                                    attackreward = mission["attacker"]["reward"]["asString"]
+                                    embed1 = discord.Embed(description=f"Attacker Reward: {attackreward}",
+                                                        url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send') #pretty sure these links are just placeholder
+                                    embed1.set_image(url=mission["attacker"]["reward"]["thumbnail"])
+                                if "reward" in mission["defender"]:
+                                    defendreward = mission["defender"]["reward"]["asString"]
+                                    embed2 = discord.Embed(description=f"Defender Reward: {defendreward}",
+                                                        url='https://old.discordjs.dev/#/docs/discord.js/14.14.1/class/EmbedBuilder')
+                                    embed2.set_image(url=mission["defender"]["reward"]["thumbnail"])
+                                location = mission["node"]
+                                description = mission["desc"]
+                                if attackreward != "":
+                                    print("runningmission")
+                                    message = await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embeds = [embed1, embed2], silent=True)
+                                    await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
+                                else:
+                                    print("runningmission2")
+                                    message = await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embed = embed2, silent=True)
+                                    await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
+                            attackreward = ""
+                            defendreward = ""
+                            embed1.clear_fields()
+                            embed2.clear_fields()
+                    await db.commit() 
+        print("command finished")
+                     
+        
+
+@bot.command()
+async def warframeInvasion(ctx):
+    response = requests.get("https://api.warframestat.us/pc/invasions")
+    status = int(response.status_code)
+    print(status)
+    if status == 200:
+        totalmessage = ""
+        async with aiosqlite.connect("main2.db") as db:
+            async with db.cursor() as cursor: 
+                for guild in bot.guilds:
+                    print("1")
+                    await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "invasions"))
+                    data = await cursor.fetchone()
+                    if data:
+                        for x in data:
+                            print(data)
+                            channel = data[0]
+                    await cursor.execute('SELECT invasionsID FROM invasionsMessages WHERE guildID = ?', (guild.id,))
+                    print("2")
+                    data = await cursor.fetchall()
+                    print(data)
+                    print("2.5")
+                    if data: #if there are invasions, go through all possible ones to find matches, if no match, post it
+                        matchFound = False
+                        for mission in response.json(): 
+                            DBID = x[0] 
+                            if jsoninvasionsID == DBID:
+                                matchFound = True
+                            if not matchFound:
+                                if mission["completed"] != True:
+                                    if "reward" in mission["attacker"]:
+                                        print(mission["attacker"]["reward"]["asString"])
+                                        attackreward = mission["attacker"]["reward"]["asString"]
+                                        embed1 = discord.Embed(description=f"Attacker Reward: {attackreward}",
+                                                            url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send') #pretty sure these links are just placeholder
+                                        embed1.set_image(url=mission["attacker"]["reward"]["thumbnail"])
+
+                                    if "reward" in mission["defender"]:
+                                        defendreward = mission["defender"]["reward"]["asString"]
+                                        embed2 = discord.Embed(description=f"Defender Reward: {defendreward}",
+                                                            url='https://old.discordjs.dev/#/docs/discord.js/14.14.1/class/EmbedBuilder')
+                                        embed2.set_image(url=mission["defender"]["reward"]["thumbnail"])
+
+                                    location = mission["node"]
+                                    description = mission["desc"]
+                                    if attackreward != "":
+                                        print("runningmission")
+                                        invasionMessages.append( await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embeds = [embed1, embed2], silent=True))
+                                    else:
+                                        print("runningmission2")
+                                        invasionMessages.append(await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embed = embed2, silent=True))
+                                    attackreward = ""
+                                    defendreward = ""
+                                    embed1.clear_fields()
+                                    embed2.clear_fields()
+                        else:
+                            for mission in response.json(): 
+                                jsoninvasionsID = mission["id"]
+                                if mission["completed"] != True:
+                                    if "reward" in mission["attacker"]:
+                                        attackreward = mission["attacker"]["reward"]["asString"]
+                                        embed1 = discord.Embed(description=f"Attacker Reward: {attackreward}",
+                                                            url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send') #pretty sure these links are just placeholder
+                                        embed1.set_image(url=mission["attacker"]["reward"]["thumbnail"])
+                                    if "reward" in mission["defender"]:
+                                        defendreward = mission["defender"]["reward"]["asString"]
+                                        embed2 = discord.Embed(description=f"Defender Reward: {defendreward}",
+                                                            url='https://old.discordjs.dev/#/docs/discord.js/14.14.1/class/EmbedBuilder')
+                                        embed2.set_image(url=mission["defender"]["reward"]["thumbnail"])
+                                    location = mission["node"]
+                                    description = mission["desc"]
+                                if attackreward != "":
+                                    print("runningmission")
+                                    message = await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embeds = [embed1, embed2], silent=True)
+                                    await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
+                                else:
+                                    print("runningmission2")
+                                    message = await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embed = embed2, silent=True)
+                                    await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
+                                attackreward = ""
+                                defendreward = ""
+                                embed1.clear_fields()
+                                embed2.clear_fields()
+        print("command finished")
+        await db.commit()            
+        #invasion_Reset.start()    
+        await ctx.send(totalmessage)
+
+@tasks.loop(hours=6)
+async def events_Reset():
+    response = requests.get("https://api.warframestat.us/pc/events")
+    status = int(response.status_code)
+    channel = 0
+    if status == 200:
+        async with aiosqlite.connect("main2.db") as db:
+            async with db.cursor() as cursor: 
+                for guild in bot.guilds:
+                    await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "events"))
+                    data = await cursor.fetchone()
+                    if data:
+                        for x in data:
+                            channel = data[0]
+                    await cursor.execute('SELECT eventsID FROM eventsMessages WHERE guildID = ?', (guild.id,))
+                    data = await cursor.fetchall()
+                    if data: #if there are events, go through all possible ones to find matches, if no match, post it
+                        for events in response.json():
+                            jsoneventsID = events["id"]
+                            matchFound = False
+                            for x in data:
+                                DBID = x[0] 
+                                if jsoneventsID == DBID:
+                                    matchFound = True
+                            if not matchFound:
+                                print("match not found")
+                                #description = events["mission"]["nodeKey"] + ": " + events["mission"]["levelOverride"] + "\nReward: " + events["mission"]["reward"]["asString"] + "\nEnds: " + events["eta"]
+                                description = "Event: " + events["description"] + " - " + events["tooltip"] + "\nLocation: " + events["node"] + "\nReward: " + events["rewards"][0]["asString"] + "\nEnds: " + events["expiry"]
+                                message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
+                                await cursor.execute('INSERT INTO eventsMessages (guildID, channelID, messageID, eventsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoneventsID ))
+                        print("data found")
+                    #if there are no news messages in the guild, fill it
+                    else:
+                        print("no data")
+                        for events in response.json():
+                                jsoneventsID = events["id"]
+                           
+                                description = "Event: " + events["description"] + " - " + events["tooltip"] + "\nLocation: " + events["node"] + "\nReward: " + events["rewards"][0]["asString"] + "\nEnds: " + events["expiry"]
+                                message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
+                                await cursor.execute('INSERT INTO eventsMessages (guildID, channelID, messageID, eventsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoneventsID ))
+
+
+
+                           
+            await db.commit()
+
 
 @tasks.loop(hours = 24)
 async def clearOldNews():
@@ -305,6 +542,66 @@ async def clearOldAlerts():
                         guild.get_channel(channel).fetch_message(x[1])
                         await cursor.execute('DELETE FROM alertsMessages WHERE alertsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED ALERTS")
+            await db.commit()
+
+@tasks.loop(hours = 24)
+async def clearOldInvasions():
+    channel = 0
+    response = requests.get("https://api.warframestat.us/pc/invasions")
+    status = int(response.status_code)
+    if status == 200:
+
+        async with aiosqlite.connect("main2.db") as db:
+            async with db.cursor() as cursor: 
+                for guild in bot.guilds:
+                    await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "invasions"))
+                    data = await cursor.fetchone()
+                    if data:
+                        for x in data:
+                            channel = data[0]
+                await cursor.execute('SELECT invasionsID, messageID FROM invasionsMessages WHERE guildID = ?', (guild.id,))
+                data = await cursor.fetchall()
+                for x in data:
+                    matchFound = False
+                    DBID = x[0]
+
+                    for invasions in response.json():
+                        if invasions["id"] == DBID and invasions["completed"] == False:
+                            matchFound = True
+                    if not matchFound:
+                        guild.get_channel(channel).fetch_message(x[1])
+                        await cursor.execute('DELETE FROM invasionsMessages WHERE invasionsID = ? AND messageID = ?', (DBID, x[1]))
+                        print("DELETED invasions")
+            await db.commit()
+
+@tasks.loop(hours = 24)
+async def clearOldEvents():
+    channel = 0
+    response = requests.get("https://api.warframestat.us/pc/events")
+    status = int(response.status_code)
+    if status == 200:
+
+        async with aiosqlite.connect("main2.db") as db:
+            async with db.cursor() as cursor: 
+                for guild in bot.guilds:
+                    await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "events"))
+                    data = await cursor.fetchone()
+                    if data:
+                        for x in data:
+                            channel = data[0]
+                await cursor.execute('SELECT eventsID, messageID FROM eventsMessages WHERE guildID = ?', (guild.id,))
+                data = await cursor.fetchall()
+                for x in data:
+                    matchFound = False
+                    DBID = x[0]
+
+                    for events in response.json():
+                        if events["id"] == DBID:
+                            matchFound = True
+                    if not matchFound:
+                        guild.get_channel(channel).fetch_message(x[1])
+                        await cursor.execute('DELETE FROM eventsMessages WHERE eventsID = ? AND messageID = ?', (DBID, x[1]))
+                        print("DELETED events")
             await db.commit()
 
      
