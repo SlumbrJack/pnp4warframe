@@ -139,10 +139,16 @@ async def setup(ctx):
             await cursor.execute('DELETE FROM invasionsMessages where guildID = ?', (ctx.guild.id,))
             await cursor.execute('DELETE FROM eventsMessages where guildID = ?', (ctx.guild.id,))
         await db.commit()
-        news_Reset.start()
-        alerts_Reset.start()
-        invasions_Reset.start()
-        events_Reset.start()
+        if(news_Reset.is_running()):
+            news_Reset.restart()
+            alerts_Reset.restart()
+            invasions_Reset.restart()
+            events_Reset.restart()
+        else:
+            news_Reset.start()
+            alerts_Reset.start()
+            invasions_Reset.start()
+            events_Reset.start()
     await ctx.send("The server is now set up for WarframeBot. Please type !help to learn more. Type \"!help (command name)\" to learn more about a specific command")
 
 @bot.command(brief='Removes all channels created by the bot', description='This command will remove the channels and categories created by this bot\nOnce complete the bot will leave the server')
