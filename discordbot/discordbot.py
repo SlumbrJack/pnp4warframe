@@ -1,11 +1,11 @@
 
-import datetime
+from datetime import datetime
 from discord.ext import commands, tasks
 import discord
 from dataclasses import dataclass
 import requests
 import aiosqlite
-
+import time
 
 bot_token = "MTE4NDIzOTY4OTY3NTMyMTQwNQ.GZdsFr.-B-RIpUGWAVqIXb-oRaz_ArZJ-0vxMaTUrgD2Y"
 channel_id = 1184248253722669096
@@ -44,7 +44,6 @@ async def on_ready():
                     async with db.cursor() as cursor:
                         #await cursor.execute('DROP TABLE buyorders')
                         await cursor.execute('CREATE TABLE IF NOT EXISTS buyorders (id INTEGER , item STRING, price INTEGER)')
-                        print("Table Created")
                     await db.commit()
             #sell table
                 async with aiosqlite.connect("main2.db") as db:
@@ -102,6 +101,17 @@ async def on_guild_join(guild):
     print("joined server")
     channel =  guild.system_channel
     await channel.send("Hello, I am WarframeBot. Please type '!setup' to get started.")
+
+@bot.command()
+async def timetest(ctx):
+    stringbase = "2022-07-16T20:10:00.000Z"
+    datestring = stringbase.split("T")[0]
+    timestring = stringbase[:-5].split("T")[1]
+    datetimestring = f"{datestring}-{timestring}"
+    timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+    print(timeobj)
+    epochtime = time.mktime(timeobj.timetuple())
+    await ctx.send(f"<t:{int(epochtime)}:R>")
 
 @bot.command(brief='Sets up the server by adding new channels', description='This command will add new channels under a new category to the server.\nWARNING: DO NO RUN THIS COMMAND MULTIPLE TIMES. DO NOT DELETE THISE CHANNELS WITHOUT USING THE CORRECT COMMAND')
 async def setup(ctx):
@@ -208,6 +218,13 @@ async def news_Reset():
                         for news in response.json():
                             jsonNewsID = news["id"]
                             matchFound = False
+                            stringbase = news["date"]
+                            datestring = stringbase.split("T")[0]
+                            timestring = stringbase[:-5].split("T")[1]
+                            datetimestring = f"{datestring}-{timestring}"
+                            timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+                            epochtime = time.mktime(timeobj.timetuple())
+                            #await ctx.send(f"<t:{int(epochtime)}:R>")
                             for x in data:
                                 DBID = x[0] 
                                 if jsonNewsID == DBID:
@@ -216,7 +233,7 @@ async def news_Reset():
                                 print("match not found")
                                 description = news["message"]
                                 link = news["link"]
-                                embed = discord.Embed(description=news["eta"],
+                                embed = discord.Embed(description=f"<t:{int(epochtime)}:R>",
                                                     url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send')  # pretty sure these links are just placeholder
                                 embed.set_image(url=news["imageLink"])
                                 
@@ -230,13 +247,21 @@ async def news_Reset():
                                 newsID = news["id"]
                                 description = news["message"]
                                 link = news["link"]
-                                embed = discord.Embed(description=news["eta"],
+                                stringbase = news["date"]
+                                datestring = stringbase.split("T")[0]
+                                timestring = stringbase[:-5].split("T")[1]
+                                datetimestring = f"{datestring}-{timestring}"
+                                timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+                                epochtime = time.mktime(timeobj.timetuple())
+                                embed = discord.Embed(description=f"<t:{int(epochtime)}:R>",
                                                     url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send')  # pretty sure these links are just placeholder
                                 embed.set_image(url=news["imageLink"])
                               
                                 message = await guild.get_channel(channel).send(f"\n\n{description}\n{link}", embeds=[embed],silent=True)
                                 await cursor.execute('INSERT INTO newsMessages (guildID, channelID, messageID, newsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, newsID ))           
             await db.commit()
+
+
 
 @tasks.loop(hours=6)
 async def alerts_Reset():
@@ -264,7 +289,13 @@ async def alerts_Reset():
                                     matchFound = True
                             if not matchFound:
                                 print("match not found")
-                                description = alerts["mission"]["nodeKey"] + ": " + alerts["mission"]["levelOverride"] + "\nReward: " + alerts["mission"]["reward"]["asString"] + "\nEnds: " + alerts["eta"]
+                                stringbase = alerts["expiry"]
+                                datestring = stringbase.split("T")[0]
+                                timestring = stringbase[:-5].split("T")[1]
+                                datetimestring = f"{datestring}-{timestring}"
+                                timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+                                epochtime = time.mktime(timeobj.timetuple())
+                                description = alerts["mission"]["nodeKey"] + ": " + alerts["mission"]["levelOverride"] + "\nReward: " + alerts["mission"]["reward"]["asString"] + "\nEnds: " + f"<t:{int(epochtime)}:R>"
                                 
                                 
                                 message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
@@ -275,7 +306,13 @@ async def alerts_Reset():
                         print("no data")
                         for alerts in response.json():
                                 jsonAlertsID = alerts["id"]
-                                description = alerts["mission"]["nodeKey"] + ": " + alerts["mission"]["levelOverride"] + "\nReward: " + alerts["mission"]["reward"]["asString"] + "\nEnds: " + alerts["eta"]
+                                stringbase = alerts["expiry"]
+                                datestring = stringbase.split("T")[0]
+                                timestring = stringbase[:-5].split("T")[1]
+                                datetimestring = f"{datestring}-{timestring}"
+                                timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+                                epochtime = time.mktime(timeobj.timetuple())
+                                description = alerts["mission"]["nodeKey"] + ": " + alerts["mission"]["levelOverride"] + "\nReward: " + alerts["mission"]["reward"]["asString"] + "\nEnds: " + f"<t:{int(epochtime)}:R>"
                                 message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
                                 await cursor.execute('INSERT INTO alertsMessages (guildID, channelID, messageID, alertsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsonAlertsID ))
 
@@ -302,6 +339,8 @@ async def invasions_Reset():
                             channel = data[0]
                     await cursor.execute('SELECT invasionsID FROM invasionsMessages WHERE guildID = ?', (guild.id,))
                     data = await cursor.fetchall()
+                    embed1 = 0
+                    embed2 = 0
                     print(data)
                     if data: #if there are invasions, go through all possible ones to find matches, if no match, post it
                         matchFound = False
@@ -337,8 +376,10 @@ async def invasions_Reset():
                                         invasionMessages.append(await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embed = embed2, silent=True))
                                     attackreward = ""
                                     defendreward = ""
-                                    embed1.clear_fields()
-                                    embed2.clear_fields()
+                                    if(embed1 != 0):
+                                        embed1.clear_fields()
+                                    if(embed1 != 0):
+                                        embed2.clear_fields()
                     else:
                         for mission in response.json(): 
                             jsoninvasionsID = mission["id"]
@@ -365,8 +406,10 @@ async def invasions_Reset():
                                     await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
                             attackreward = ""
                             defendreward = ""
-                            embed1.clear_fields()
-                            embed2.clear_fields()
+                            if(embed1 != 0):
+                                embed1.clear_fields()
+                            if(embed1 != 0):
+                                embed2.clear_fields()
                     await db.commit() 
         print("command finished")
 
@@ -396,8 +439,14 @@ async def events_Reset():
                                     matchFound = True
                             if not matchFound:
                                 print("match not found")
+                                stringbase = events["expiry"]
+                                datestring = stringbase.split("T")[0]
+                                timestring = stringbase[:-5].split("T")[1]
+                                datetimestring = f"{datestring}-{timestring}"
+                                timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+                                epochtime = time.mktime(timeobj.timetuple())
                                 #description = events["mission"]["nodeKey"] + ": " + events["mission"]["levelOverride"] + "\nReward: " + events["mission"]["reward"]["asString"] + "\nEnds: " + events["eta"]
-                                description = "Event: " + events["description"] + " - " + events["tooltip"] + "\nLocation: " + events["node"] + "\nReward: " + events["rewards"][0]["asString"] + "\nEnds: " + events["expiry"]
+                                description = "Event: " + events["description"] + " - " + events["tooltip"] + "\nLocation: " + events["node"] + "\nReward: " + events["rewards"][0]["asString"] + "\nEnds: " + f"<t:{int(epochtime)}:R>"
                                 message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
                                 await cursor.execute('INSERT INTO eventsMessages (guildID, channelID, messageID, eventsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoneventsID ))
                         print("data found")
@@ -407,8 +456,13 @@ async def events_Reset():
                         for events in response.json():
                                 print("no data:event2")
                                 jsoneventsID = events["id"]
-                           
-                                description = "Event: " + events["description"] + " - " + events["tooltip"] + "\nLocation: " + events["node"] + "\nReward: " + events["rewards"][0]["asString"] + "\nEnds: " + events["expiry"]
+                                stringbase = events["expiry"]
+                                datestring = stringbase.split("T")[0]
+                                timestring = stringbase[:-5].split("T")[1]
+                                datetimestring = f"{datestring}-{timestring}"
+                                timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+                                epochtime = time.mktime(timeobj.timetuple())
+                                description = "Event: " + events["description"] + " - " + events["tooltip"] + "\nLocation: " + events["node"] + "\nReward: " + events["rewards"][0]["asString"] + "\nEnds: " + f"<t:{int(epochtime)}:R>"
                                 message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
                                 await cursor.execute('INSERT INTO eventsMessages (guildID, channelID, messageID, eventsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoneventsID ))
 
@@ -543,28 +597,28 @@ async def clearOldEvents():
 
 @bot.command(brief='Lists cycles for open zones', description= 'Lists the current cycles for Cetus, Orb Vallis, and Cambion Drift')
 async def cycles(ctx):
+    requests.patch(url="https://discord.com/api/v9/users/@warframebot", headers= {"authorization": bot_token}, json = {"bio": "TestBot Bio"} )
     response = requests.get("https://api.warframestat.us/pc/cetusCycle")
     status = int(response.status_code)
     if status == 200:
+        stringbase = response.json()["shortString"]
         cycleStatus = response.json()["state"]
-        timeLeft = response.json()["shortString"]
-        print(1)
-        await ctx.send("It is currently: " + cycleStatus + "\n" + timeLeft)
-        print(2)
+        await ctx.send("It is currently: " + cycleStatus + " in Cetus\n" + stringbase)
+
 
     response = requests.get("https://api.warframestat.us/pc/vallisCycle")
     status = int(response.status_code)
     if status == 200:
+        stringbase = response.json()["shortString"]
         cycleStatus = response.json()["state"]
-        timeLeft = response.json()["shortString"]
-        await ctx.send("It is currently: " + cycleStatus + "\n" + timeLeft)
+        await ctx.send("It is currently: " + cycleStatus + " in Orb Vallis\n" + stringbase)
 
     response = requests.get("https://api.warframestat.us/pc/cambionCycle")
     status = int(response.status_code)
     if status == 200:
+        stringbase = response.json()["timeLeft"]
         cycleStatus = response.json()["state"]
-        timeLeft = response.json()["timeLeft"]
-        await ctx.send("It is currently: " + cycleStatus + "\nTime Remaining: " + timeLeft)
+        await ctx.send("It is currently: " + cycleStatus + " in Cambion Drift\n" + stringbase)
 
 @bot.command(brief='Information on the Void Trader', description='')
 async def baro(ctx):
@@ -576,18 +630,30 @@ async def baro(ctx):
         arrives = response.json()["startString"]
         leaves = response.json()["endString"]
         if(bActive):
-            await ctx.send("Baro is currently at " + location +" and will leave in " + leaves)
+            stringbase = response.json()["expiry"]
+            datestring = stringbase.split("T")[0]
+            timestring = stringbase[:-5].split("T")[1]
+            datetimestring = f"{datestring}-{timestring}"
+            timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+            epochtime = time.mktime(timeobj.timetuple())
+            await ctx.send("Baro is currently at " + location +" and will leave " + f"<t:{int(epochtime)}:R>")
         else:
-            await ctx.send("Baro will arrive at " + location +" in " + arrives)
+            stringbase = response.json()["activation"]
+            datestring = stringbase.split("T")[0]
+            timestring = stringbase[:-5].split("T")[1]
+            datetimestring = f"{datestring}-{timestring}"
+            timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+            epochtime = time.mktime(timeobj.timetuple())
+            await ctx.send("Baro will arrive at " + location + f" <t:{int(epochtime)}:R>")
 
 
-
+'''
 @bot.event
 async def on_command_error(ctx,error):
     if isinstance(error, commands.CommandError):
         
         await ctx.send("There was an error using that command, use \"!help (the command you are trying to use)\" to learn more!")    
-
+'''
 @bot.command(brief= 'Adds an item to a purchase wishlist', description = 'Adds an item you would like to purchase to a wish list.\nWhen a sell order is placed on WarframeMarket for less than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addPurchase nezha_price_neuroptics 20')
 async def addPurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")): 
     if not price.isdigit():
