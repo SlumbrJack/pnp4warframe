@@ -88,7 +88,6 @@ async def on_ready():
                 clearOldInvasions.start()
                 events_Reset.start()
                 clearOldEvents.start()
-
                 checkPurchaseOrders.start()
                 checkSellOrders.start()
 
@@ -356,6 +355,7 @@ async def invasions_Reset():
                                     matchFound = True
                             if not matchFound:
                                 if mission["completed"] != True:
+                                    attackreward = ""
                                     if "reward" in mission["attacker"]:
                                         print(mission["attacker"]["reward"]["asString"])
                                         attackreward = mission["attacker"]["reward"]["asString"]
@@ -500,7 +500,7 @@ async def clearOldNews():
                         if news["id"] == DBID:
                             matchFound = True
                     if not matchFound:
-                        guild.get_channel(channel).fetch_message(x[1])
+                        await guild.get_channel(channel).fetch_message(x[1]).delete()
                         await cursor.execute('DELETE FROM newsMessages WHERE newsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED NEWS")
             await db.commit()
@@ -511,7 +511,6 @@ async def clearOldAlerts():
     response = requests.get("https://api.warframestat.us/pc/alerts")
     status = int(response.status_code)
     if status == 200:
-
         async with aiosqlite.connect("main2.db") as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
@@ -530,7 +529,7 @@ async def clearOldAlerts():
                         if alerts["id"] == DBID:
                             matchFound = True
                     if not matchFound:
-                        guild.get_channel(channel).fetch_message(x[1])
+                        await guild.get_channel(channel).fetch_message(x[1]).delete()
                         await cursor.execute('DELETE FROM alertsMessages WHERE alertsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED ALERTS")
             await db.commit()
@@ -560,7 +559,7 @@ async def clearOldInvasions():
                         if invasions["id"] == DBID and invasions["completed"] == False:
                             matchFound = True
                     if not matchFound:
-                        guild.get_channel(channel).fetch_message(x[1])
+                        await guild.get_channel(channel).fetch_message(x[1]).delete()
                         await cursor.execute('DELETE FROM invasionsMessages WHERE invasionsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED invasions")
             await db.commit()
@@ -590,7 +589,7 @@ async def clearOldEvents():
                         if events["id"] == DBID:
                             matchFound = True
                     if not matchFound:
-                        guild.get_channel(channel).fetch_message(x[1])
+                        await guild.get_channel(channel).fetch_message(x[1]).delete()
                         await cursor.execute('DELETE FROM eventsMessages WHERE eventsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED events")
             await db.commit()
