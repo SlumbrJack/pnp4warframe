@@ -100,24 +100,27 @@ async def on_ready():
 async def on_guild_join(guild):
     print("joined server")
     channel =  guild.system_channel
-    await channel.send("Hello, I am WarframeBot. Please type '!setup' to get started.")
+    await channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=Buttons())
 
-@bot.command()
-async def timetest(ctx):
-    stringbase = "2022-07-16T20:10:00.000Z"
-    datestring = stringbase.split("T")[0]
-    timestring = stringbase[:-5].split("T")[1]
-    datetimestring = f"{datestring}-{timestring}"
-    timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
-    print(timeobj)
-    epochtime = time.mktime(timeobj.timetuple())
-    await ctx.send(f"<t:{int(epochtime)}:R>")
+class Buttons(discord.ui.View):
+    def __init__(self, *, timeout=180):
+        super().__init__(timeout=timeout)
+    @discord.ui.button(label="Set Up",style=discord.ButtonStyle.blurple)
+    async def gray_button(self,interaction:discord.Interaction,button:discord.ui.Button):
+        await interaction.response.edit_message(content="", delete_after=1)
+        await setup(interaction.channel_id, interaction.guild_id)
+        
 
-@bot.command(brief='Sets up the server by adding new channels', description='This command will add new channels under a new category to the server.\nWARNING: DO NO RUN THIS COMMAND MULTIPLE TIMES. DO NOT DELETE THISE CHANNELS WITHOUT USING THE CORRECT COMMAND')
-async def setup(ctx):
-    guild = ctx.guild
-    print(guild.id)
-    
+
+async def pretendSetup(channel, guild):
+    print(f"Totally Setting Up!:{channel} and {guild}")
+    #guild.get_channel(channel).send("Totally Setting Up!")
+    await bot.get_guild(guild).get_channel(channel).send("Totally Setting Up!")
+
+#@bot.command(brief='Sets up the server by adding new channels', description='This command will add new channels under a new category to the server.\nWARNING: DO NO RUN THIS COMMAND MULTIPLE TIMES. DO NOT DELETE THISE CHANNELS WITHOUT USING THE CORRECT COMMAND')
+async def setup(channelid, guildid):
+    guild = bot.get_guild(guildid)
+    mainchannel = guild.get_channel(channelid)
     print("starting setup")
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(send_messages=False)
@@ -140,10 +143,10 @@ async def setup(ctx):
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "cycles"))
             channel = await guild.create_text_channel("warframe-market", category = category)
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "market"))
-            await cursor.execute('DELETE FROM newsMessages where guildID = ?', (ctx.guild.id,))
-            await cursor.execute('DELETE FROM alertsMessages where guildID = ?', (ctx.guild.id,))
-            await cursor.execute('DELETE FROM invasionsMessages where guildID = ?', (ctx.guild.id,))
-            await cursor.execute('DELETE FROM eventsMessages where guildID = ?', (ctx.guild.id,))
+            await cursor.execute('DELETE FROM newsMessages where guildID = ?', (guildid,))
+            await cursor.execute('DELETE FROM alertsMessages where guildID = ?', (guildid,))
+            await cursor.execute('DELETE FROM invasionsMessages where guildID = ?', (guildid,))
+            await cursor.execute('DELETE FROM eventsMessages where guildID = ?', (guildid,))
         await db.commit()
         if(news_Reset.is_running()):
             news_Reset.restart()
@@ -155,7 +158,7 @@ async def setup(ctx):
             alerts_Reset.start()
             invasions_Reset.start()
             events_Reset.start()
-    await ctx.send("The server is now set up for WarframeBot. Please type !help to learn more. Type \"!help (command name)\" to learn more about a specific command")
+    await mainchannel.send("The server is now set up for WarframeBot. Please type !help to learn more. Type \"!help (command name)\" to learn more about a specific command")
 
 @bot.command(brief='Removes all channels created by the bot', description='This command will remove the channels and categories created by this bot\nOnce complete the bot will leave the server')
 async def removeBotFromServer(ctx):
