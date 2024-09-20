@@ -33,7 +33,7 @@ invasionMessages = []
 async def on_ready():
     #channel = bot.get_channel(channel_id)
    # await channel.purge(bulk = False)
-    async with aiosqlite.connect("main2.db") as db:
+    async with aiosqlite.connect("main2.db", timeout=10) as db:
         async with db.cursor() as cursor:
             await cursor.execute('SELECT guildID FROM channels',)
             data = await cursor.fetchall()
@@ -80,6 +80,13 @@ async def on_ready():
                         #await cursor.execute('DROP TABLE invasionsMessages')
                         await cursor.execute('CREATE TABLE IF NOT EXISTS invasionsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, invasionsID STRING)')
                     await db.commit()
+                for guild in bot.guilds:
+                    for x in data:
+                        if guild.id not in x:
+                            print("Guild ID:" + str(guild.id))
+                            print("Data: " + str(data))
+                            await guild.system_channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=Buttons())
+                    
                 news_Reset.start() 
                 clearOldNews.start()
                 alerts_Reset.start()
@@ -161,7 +168,7 @@ async def setup(channelid, guildid):
 
 @bot.command(brief='Removes all channels created by the bot', description='This command will remove the channels and categories created by this bot\nOnce complete the bot will leave the server')
 async def removeBotFromServer(ctx):
-    async with aiosqlite.connect("main2.db") as db:
+    async with aiosqlite.connect("main2.db", timeout=10) as db:
         async with db.cursor() as cursor:
             await cursor.execute('SELECT channelID FROM channels WHERE guildID = ?', (ctx.guild.id,))
             data = await cursor.fetchall()
@@ -201,7 +208,7 @@ async def news_Reset():
     channel = 0
     if status == 200:
 
-        async with aiosqlite.connect("main2.db") as db:
+        async with aiosqlite.connect("main2.db", timeout=10) as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
                     print(bot.guilds)
@@ -271,7 +278,7 @@ async def alerts_Reset():
     status = int(response.status_code)
     channel = 0
     if status == 200:
-        async with aiosqlite.connect("main2.db") as db:
+        async with aiosqlite.connect("main2.db", timeout=10) as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
                     await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "alerts"))
@@ -330,7 +337,7 @@ async def invasions_Reset():
     print(status)
     if status == 200:
         totalmessage = ""
-        async with aiosqlite.connect("main2.db") as db:
+        async with aiosqlite.connect("main2.db", timeout=10) as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
                     await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "invasions"))
@@ -414,7 +421,9 @@ async def invasions_Reset():
                             if(embed1 != 0):
                                 embed2.clear_fields()
                     await db.commit() 
+            await db.close()
         print("command finished")
+        
 
 @tasks.loop(hours=6)
 async def events_Reset():
@@ -422,11 +431,12 @@ async def events_Reset():
     status = int(response.status_code)
     channel = 0
     if status == 200:
-        async with aiosqlite.connect("main2.db") as db:
+        async with aiosqlite.connect("main2.db", timeout=10) as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
                     await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "events"))
                     data = await cursor.fetchone()
+                    print("Event Data: " + str(data))
                     if data:
                         for x in data:
                             channel = data[0]
@@ -465,7 +475,15 @@ async def events_Reset():
                                 datetimestring = f"{datestring}-{timestring}"
                                 timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
                                 epochtime = time.mktime(timeobj.timetuple())
-                                description = "Event: " + events["description"] + " - " + events["tooltip"] + "\nLocation: " + events["node"] + "\nReward: " + events["rewards"][0]["asString"] + "\nEnds: " + f"<t:{int(epochtime)}:R>"
+                                node = ""
+                                if("node" in events):
+                                    node = "\nLocation: " +events["node"]
+                                elif("victimNode" in events):
+                                    node = "\nLocation: " +events["victimNode"]
+                                rewards = ""
+                                if(len(events["rewards"]) != 0):
+                                    rewards = "\nReward: " + events["rewards"][0]["asString"]
+                                description = "Event: " + events["description"] + " - " + events["tooltip"] +  node + rewards + "\nEnds: " + f"<t:{int(epochtime)}:R>"
                                 message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
                                 await cursor.execute('INSERT INTO eventsMessages (guildID, channelID, messageID, eventsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoneventsID ))
 
@@ -473,6 +491,7 @@ async def events_Reset():
 
                            
             await db.commit()
+        await db.close()
 
 
 @tasks.loop(hours = 24)
@@ -500,10 +519,12 @@ async def clearOldNews():
                         if news["id"] == DBID:
                             matchFound = True
                     if not matchFound:
-                        await guild.get_channel(channel).fetch_message(x[1]).delete()
+                        message = await guild.get_channel(channel).fetch_message(x[1])
+                        await message.delete()
                         await cursor.execute('DELETE FROM newsMessages WHERE newsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED NEWS")
             await db.commit()
+        await db.close()
 
 @tasks.loop(hours = 24)
 async def clearOldAlerts():
@@ -533,6 +554,7 @@ async def clearOldAlerts():
                         await cursor.execute('DELETE FROM alertsMessages WHERE alertsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED ALERTS")
             await db.commit()
+        await db.close()
 
 @tasks.loop(hours = 24)
 async def clearOldInvasions():
@@ -563,6 +585,7 @@ async def clearOldInvasions():
                         await cursor.execute('DELETE FROM invasionsMessages WHERE invasionsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED invasions")
             await db.commit()
+        await db.close()
 
 @tasks.loop(hours = 24)
 async def clearOldEvents():
@@ -593,6 +616,7 @@ async def clearOldEvents():
                         await cursor.execute('DELETE FROM eventsMessages WHERE eventsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED events")
             await db.commit()
+        await db.close()
 
      
                         
@@ -671,6 +695,7 @@ async def addPurchase(ctx, item = commands.parameter(description="Must be repres
                     await cursor.execute('INSERT INTO buyorders (id, item, price) VALUES (?,?,?)', (ctx.message.author.id, item.lower(), price))
                     await ctx.send("You have added " + item + " to your purchase wishlist for " + price + " platinum")
             await db.commit()
+        await db.close()
 
 @bot.command(brief= 'Removes an item from the purchase wishlist', description= 'Removes an item from your purchase wishlist.\nYou will no longer receive messages about this item. Example usage: !removePurchase nidus_prime_chassis') 
 async def removePurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems")):
@@ -679,6 +704,7 @@ async def removePurchase(ctx, item = commands.parameter(description="Must be rep
             await cursor.execute('DELETE FROM buyorders WHERE item = ? AND id = ?',  (item.lower(), ctx.message.author.id))
             await ctx.send("You have removed " + item + " from your purchase wishlist")
         await db.commit()
+    await db.close()
 
 @bot.command(brief= 'Adds an item to a sell wishlist', description = 'Adds an item you would like to sell to a wish list.\nWhen a buy order is placed on WarframeMarket for more than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addSale nezha_price_neuroptics 10')
 async def addSale(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")):
@@ -692,6 +718,7 @@ async def addSale(ctx, item = commands.parameter(description="Must be represente
                 await cursor.execute('INSERT INTO sellorders (id, item, price) VALUES (?,?,?)', (ctx.message.author.id, item.lower(), price))
                 await ctx.send("You have added " + item + " to your sell wishlist for " + price + " platinum")
         await db.commit()
+    await db.close()
 
 @bot.command(brief= 'Removes an item from the sell wishlist', description= 'Removes an item from your sale wishlist.\nYou will no longer receive messages about this item. Example usage: !removeSale nidus_prime_chassis')
 async def removeSale(ctx, item):
@@ -700,6 +727,7 @@ async def removeSale(ctx, item):
             await cursor.execute('DELETE FROM sellorders WHERE item = ? AND id = ?',  (item.lower(), ctx.message.author.id))
             await ctx.send("You have removed " + item + " from your sell wishlist")
         await db.commit()
+    await db.close()
 
 @bot.command(brief="Shows a list of your wishlisted items", description="Shows a list of your purchase and sell wishlisted items.")
 async def wishlist(ctx):
@@ -719,6 +747,7 @@ async def wishlist(ctx):
                 for x in data:
                     message += (x[0] + "\n")
             await ctx.send(message)
+    await db.close()
 
 @tasks.loop(minutes = 7)
 async def checkPurchaseOrders():
@@ -749,6 +778,7 @@ async def checkPurchaseOrders():
                                 print("looped " + str(loopInt) + " times")
                                 break
             await db.commit()
+    await db.close()
 
 @tasks.loop(minutes = 15)
 async def checkSellOrders():
@@ -779,6 +809,7 @@ async def checkSellOrders():
                                 print("looped " + str(loopInt) + " times")
                                 break
             await db.commit()
+    await db.close()
 
 
 
