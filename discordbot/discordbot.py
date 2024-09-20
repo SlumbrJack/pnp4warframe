@@ -33,7 +33,7 @@ invasionMessages = []
 async def on_ready():
     #channel = bot.get_channel(channel_id)
    # await channel.purge(bulk = False)
-    async with aiosqlite.connect("main2.db", timeout=10) as db:
+    async with aiosqlite.connect("main2.db", timeout=30) as db:
         async with db.cursor() as cursor:
             await cursor.execute('SELECT guildID FROM channels',)
             data = await cursor.fetchall()
@@ -80,13 +80,6 @@ async def on_ready():
                         #await cursor.execute('DROP TABLE invasionsMessages')
                         await cursor.execute('CREATE TABLE IF NOT EXISTS invasionsMessages (guildID INTEGER , channelID INTEGER, messageID INTEGER, invasionsID STRING)')
                     await db.commit()
-                for guild in bot.guilds:
-                    for x in data:
-                        if guild.id not in x:
-                            print("Guild ID:" + str(guild.id))
-                            print("Data: " + str(data))
-                            await guild.system_channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=Buttons())
-                    
                 news_Reset.start() 
                 clearOldNews.start()
                 alerts_Reset.start()
@@ -97,6 +90,19 @@ async def on_ready():
                 clearOldEvents.start()
                 checkPurchaseOrders.start()
                 checkSellOrders.start()
+            for guild in bot.guilds:
+                if(data):
+                    for x in data:
+                        if guild.id not in x:
+                            print("Guild ID:" + str(guild.id))
+                            print("Data: " + str(data))
+                            await guild.system_channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=Buttons())
+                else:
+                    print("Guild ID:" + str(guild.id))
+                    print("Data: " + str(data))
+                    await guild.system_channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=Buttons())
+            
+                
 
     #await channel.send("Hello! Warframebot is ready!", silent = True)
 
@@ -168,7 +174,7 @@ async def setup(channelid, guildid):
 
 @bot.command(brief='Removes all channels created by the bot', description='This command will remove the channels and categories created by this bot\nOnce complete the bot will leave the server')
 async def removeBotFromServer(ctx):
-    async with aiosqlite.connect("main2.db", timeout=10) as db:
+    async with aiosqlite.connect("main2.db", timeout=30) as db:
         async with db.cursor() as cursor:
             await cursor.execute('SELECT channelID FROM channels WHERE guildID = ?', (ctx.guild.id,))
             data = await cursor.fetchall()
@@ -208,7 +214,7 @@ async def news_Reset():
     channel = 0
     if status == 200:
 
-        async with aiosqlite.connect("main2.db", timeout=10) as db:
+        async with aiosqlite.connect("main2.db", timeout=30) as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
                     print(bot.guilds)
@@ -278,7 +284,7 @@ async def alerts_Reset():
     status = int(response.status_code)
     channel = 0
     if status == 200:
-        async with aiosqlite.connect("main2.db", timeout=10) as db:
+        async with aiosqlite.connect("main2.db", timeout=30) as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
                     await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "alerts"))
@@ -337,7 +343,7 @@ async def invasions_Reset():
     print(status)
     if status == 200:
         totalmessage = ""
-        async with aiosqlite.connect("main2.db", timeout=10) as db:
+        async with aiosqlite.connect("main2.db", timeout=30) as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
                     await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "invasions"))
@@ -431,7 +437,7 @@ async def events_Reset():
     status = int(response.status_code)
     channel = 0
     if status == 200:
-        async with aiosqlite.connect("main2.db", timeout=10) as db:
+        async with aiosqlite.connect("main2.db", timeout=30) as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
                     await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "events"))
