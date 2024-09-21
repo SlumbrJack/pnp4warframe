@@ -362,11 +362,11 @@ async def invasions_Reset():
                     if data: #if there are invasions, go through all possible ones to find matches, if no match, post it
                         matchFound = False
                         for mission in response.json():
-                            jsonAlertsID = mission["id"]
+                            jsoninvasionsID = mission["id"]
                             matchFound = False
                             for x in data:
                                 DBID = x[0] 
-                                if jsonAlertsID == DBID:
+                                if jsoninvasionsID == DBID:
                                     matchFound = True
                             if not matchFound:
                                 if mission["completed"] != True:
@@ -532,7 +532,8 @@ async def clearOldAlerts():
                         if alerts["id"] == DBID:
                             matchFound = True
                     if not matchFound:
-                        await guild.get_channel(channel).fetch_message(x[1]).delete()
+                        message = await guild.get_channel(channel).fetch_message(x[1])
+                        await message.delete()
                         await cursor.execute('DELETE FROM alertsMessages WHERE alertsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED ALERTS")
             await db.commit()
@@ -563,7 +564,8 @@ async def clearOldInvasions():
                         if invasions["id"] == DBID and invasions["completed"] == False:
                             matchFound = True
                     if not matchFound:
-                        await guild.get_channel(channel).fetch_message(x[1]).delete()
+                        message = await guild.get_channel(channel).fetch_message(x[1])
+                        await message.delete()
                         await cursor.execute('DELETE FROM invasionsMessages WHERE invasionsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED invasions")
             await db.commit()
@@ -594,7 +596,8 @@ async def clearOldEvents():
                         if events["id"] == DBID:
                             matchFound = True
                     if not matchFound:
-                        await guild.get_channel(channel).fetch_message(x[1]).delete()
+                        message = await guild.get_channel(channel).fetch_message(x[1])
+                        await message.delete()
                         await cursor.execute('DELETE FROM eventsMessages WHERE eventsID = ? AND messageID = ?', (DBID, x[1]))
                         print("DELETED events")
             await db.commit()
