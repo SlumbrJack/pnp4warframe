@@ -94,12 +94,8 @@ async def on_ready():
                 if(data):
                     for x in data:
                         if guild.id not in x:
-                            print("Guild ID:" + str(guild.id))
-                            print("Data: " + str(data))
                             await guild.system_channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=Buttons())
                 else:
-                    print("Guild ID:" + str(guild.id))
-                    print("Data: " + str(data))
                     await guild.system_channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=Buttons())
             
                 
@@ -121,13 +117,33 @@ class Buttons(discord.ui.View):
     async def gray_button(self,interaction:discord.Interaction,button:discord.ui.Button):
         await interaction.response.edit_message(content="", delete_after=1)
         await setup(interaction.channel_id, interaction.guild_id)
-        
 
+@bot.command()    
+async def testInvasionButtons(ctx):
+    response = requests.get("https://api.warframestat.us/pc/invasions")
+    status = int(response.status_code)
+    newsDict = {}
+    if status == 200:
+        for mission in response.json():
+            jsonInvasionID = mission["id"]
+            title = mission["desc"]
+            node = mission["node"]
+            attackreward = ""
+            defendreward = ""
+            defendimage = ""
+            if "reward" in mission["attacker"]:
+                attackreward = mission["attacker"]["reward"]["asString"]
+                attackimage = mission["attacker"]["reward"]["thumbnail"]
+            if "reward" in mission["defender"]:
+                defendreward = mission["defender"]["reward"]["asString"]
+                defendimage = mission["defender"]["reward"]["thumbnail"]
+            embedVar = discord.Embed(title=title, description=node, color=0xffa40d)
+            if(attackreward != ""): embedVar.add_field(name="Attack Reward", value=attackreward, inline=True)
+            if(defendreward != ""): embedVar.add_field(name="Defend Reward", value=defendreward, inline=True)
+            embedVar.set_image(url=defendimage) 
+            await ctx.send(embeds=[embedVar])
+            
 
-async def pretendSetup(channel, guild):
-    print(f"Totally Setting Up!:{channel} and {guild}")
-    #guild.get_channel(channel).send("Totally Setting Up!")
-    await bot.get_guild(guild).get_channel(channel).send("Totally Setting Up!")
 
 #@bot.command(brief='Sets up the server by adding new channels', description='This command will add new channels under a new category to the server.\nWARNING: DO NO RUN THIS COMMAND MULTIPLE TIMES. DO NOT DELETE THISE CHANNELS WITHOUT USING THE CORRECT COMMAND')
 async def setup(channelid, guildid):
@@ -207,7 +223,7 @@ async def removeBotFromServer(ctx):
         await db.commit()
 
 
-@tasks.loop(hours=6)
+@tasks.loop(minutes=30)
 async def news_Reset():
     response = requests.get("https://api.warframestat.us/pc/news")
     status = int(response.status_code)
@@ -217,16 +233,11 @@ async def news_Reset():
         async with aiosqlite.connect("main2.db", timeout=30) as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
-                    print(bot.guilds)
                     await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "news"))
                     data = await cursor.fetchone()
                     if data:
                         for x in data:
-                            channel = data[0]
-                            print(channel)
-                    else:
-                        print("ERROR BREAK 174")
-
+                            channel = data[0]         
                     await cursor.execute('SELECT newsID FROM newsMessages WHERE guildID = ?', (guild.id,))
                     data = await cursor.fetchall()
                     if data: #if there are news messages, go through all possible ones to find matches, if no match, post it
@@ -245,19 +256,16 @@ async def news_Reset():
                                 if jsonNewsID == DBID:
                                     matchFound = True
                             if not matchFound:
-                                print("match not found")
+                                stringbase = news["date"]
                                 description = news["message"]
                                 link = news["link"]
-                                embed = discord.Embed(description=f"<t:{int(epochtime)}:R>",
-                                                    url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send')  # pretty sure these links are just placeholder
-                                embed.set_image(url=news["imageLink"])
-                                
-                                message = await guild.get_channel(channel).send(f"\n\n{description}\n{link}", embeds=[embed],silent=True)
+                                embedVar = discord.Embed(title=description, description=f"<t:{int(epochtime)}:R>", color=0x00ff00)
+                                embedVar.add_field(name="", value=f"[Link]({link})", inline=False)
+                                embedVar.set_image(url=news["imageLink"]) 
+                                message = await guild.get_channel(channel).send(embeds=[embedVar],silent=True)
                                 await cursor.execute('INSERT INTO newsMessages (guildID, channelID, messageID, newsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsonNewsID ))
-                        print("data found")
                     #if there are no news messages in the guild, fill it
                     else:
-                        print("no data")
                         for news in response.json():
                                 newsID = news["id"]
                                 description = news["message"]
@@ -268,17 +276,18 @@ async def news_Reset():
                                 datetimestring = f"{datestring}-{timestring}"
                                 timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
                                 epochtime = time.mktime(timeobj.timetuple())
-                                embed = discord.Embed(description=f"<t:{int(epochtime)}:R>",
-                                                    url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send')  # pretty sure these links are just placeholder
-                                embed.set_image(url=news["imageLink"])
-                              
-                                message = await guild.get_channel(channel).send(f"\n\n{description}\n{link}", embeds=[embed],silent=True)
+                                embedVar = discord.Embed(title=description, description=f"<t:{int(epochtime)}:R>", color=0x00ff00)
+                                embedVar.add_field(name="", value=f"[Link]({link})", inline=False)
+                                embedVar.set_image(url=news["imageLink"]) 
+                                message = await guild.get_channel(channel).send(embeds=[embedVar],silent=True)
                                 await cursor.execute('INSERT INTO newsMessages (guildID, channelID, messageID, newsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, newsID ))           
             await db.commit()
+            await db.close()
+            print("News Finished")
 
 
 
-@tasks.loop(hours=6)
+@tasks.loop(minutes=30)
 async def alerts_Reset():
     response = requests.get("https://api.warframestat.us/pc/alerts")
     status = int(response.status_code)
@@ -303,7 +312,6 @@ async def alerts_Reset():
                                 if jsonAlertsID == DBID:
                                     matchFound = True
                             if not matchFound:
-                                print("match not found")
                                 stringbase = alerts["expiry"]
                                 datestring = stringbase.split("T")[0]
                                 timestring = stringbase[:-5].split("T")[1]
@@ -315,10 +323,8 @@ async def alerts_Reset():
                                 
                                 message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
                                 await cursor.execute('INSERT INTO alertsMessages (guildID, channelID, messageID, alertsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsonAlertsID ))
-                        print("data found")
                     #if there are no news messages in the guild, fill it
                     else:
-                        print("no data")
                         for alerts in response.json():
                                 jsonAlertsID = alerts["id"]
                                 stringbase = alerts["expiry"]
@@ -335,14 +341,14 @@ async def alerts_Reset():
 
                            
             await db.commit()
+            await db.close()
+            print("Alerts Finished")
 
-@tasks.loop(hours=6)
+@tasks.loop(minutes=30)
 async def invasions_Reset():
     response = requests.get("https://api.warframestat.us/pc/invasions")
     status = int(response.status_code)
-    print(status)
     if status == 200:
-        totalmessage = ""
         async with aiosqlite.connect("main2.db", timeout=30) as db:
             async with db.cursor() as cursor: 
                 for guild in bot.guilds:
@@ -350,13 +356,9 @@ async def invasions_Reset():
                     data = await cursor.fetchone()
                     if data:
                         for x in data:
-                            print(data)
                             channel = data[0]
                     await cursor.execute('SELECT invasionsID FROM invasionsMessages WHERE guildID = ?', (guild.id,))
                     data = await cursor.fetchall()
-                    embed1 = 0
-                    embed2 = 0
-                    print(data)
                     if data: #if there are invasions, go through all possible ones to find matches, if no match, post it
                         matchFound = False
                         for mission in response.json():
@@ -368,70 +370,48 @@ async def invasions_Reset():
                                     matchFound = True
                             if not matchFound:
                                 if mission["completed"] != True:
-                                    attackreward = ""
-                                    if "reward" in mission["attacker"]:
-                                        print(mission["attacker"]["reward"]["asString"])
-                                        attackreward = mission["attacker"]["reward"]["asString"]
-                                        embed1 = discord.Embed(description=f"Attacker Reward: {attackreward}",
-                                                            url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send') #pretty sure these links are just placeholder
-                                        embed1.set_image(url=mission["attacker"]["reward"]["thumbnail"])
-
-                                    if "reward" in mission["defender"]:
-                                        defendreward = mission["defender"]["reward"]["asString"]
-                                        embed2 = discord.Embed(description=f"Defender Reward: {defendreward}",
-                                                            url='https://old.discordjs.dev/#/docs/discord.js/14.14.1/class/EmbedBuilder')
-                                        embed2.set_image(url=mission["defender"]["reward"]["thumbnail"])
-
-                                    location = mission["node"]
-                                    description = mission["desc"]
-                                    if attackreward != "":
-                                        print("runningmission")
-                                        invasionMessages.append( await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embeds = [embed1, embed2], silent=True))
-                                    else:
-                                        print("runningmission2")
-                                        invasionMessages.append(await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embed = embed2, silent=True))
+                                    title = mission["desc"]
+                                    node = mission["node"]
                                     attackreward = ""
                                     defendreward = ""
-                                    if(embed1 != 0):
-                                        embed1.clear_fields()
-                                    if(embed1 != 0):
-                                        embed2.clear_fields()
+                                    defendimage = ""
+                                    if "reward" in mission["attacker"]:
+                                        attackreward = mission["attacker"]["reward"]["asString"]
+                                    if "reward" in mission["defender"]:
+                                        defendreward = mission["defender"]["reward"]["asString"]
+                                        defendimage = mission["defender"]["reward"]["thumbnail"]
+                                    embedVar = discord.Embed(title=title, description=node, color=0xffa40d)
+                                    if(attackreward != ""): embedVar.add_field(name="Attack Reward", value=attackreward, inline=True)
+                                    if(defendreward != ""): embedVar.add_field(name="Defend Reward", value=defendreward, inline=True)
+                                    embedVar.set_image(url=defendimage) 
+                                    message = await guild.get_channel(channel).send(embeds=[embedVar])
+                                    await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
                     else:
                         for mission in response.json(): 
                             jsoninvasionsID = mission["id"]
                             if mission["completed"] != True:
+                                title = mission["desc"]
+                                node = mission["node"]
+                                attackreward = ""
+                                defendreward = ""
+                                defendimage = ""
                                 if "reward" in mission["attacker"]:
                                     attackreward = mission["attacker"]["reward"]["asString"]
-                                    embed1 = discord.Embed(description=f"Attacker Reward: {attackreward}",
-                                                        url='https://discordpy.readthedocs.io/en/stable/api.html?highlight=send#discord.abc.Messageable.send') #pretty sure these links are just placeholder
-                                    embed1.set_image(url=mission["attacker"]["reward"]["thumbnail"])
                                 if "reward" in mission["defender"]:
                                     defendreward = mission["defender"]["reward"]["asString"]
-                                    embed2 = discord.Embed(description=f"Defender Reward: {defendreward}",
-                                                        url='https://old.discordjs.dev/#/docs/discord.js/14.14.1/class/EmbedBuilder')
-                                    embed2.set_image(url=mission["defender"]["reward"]["thumbnail"])
-                                location = mission["node"]
-                                description = mission["desc"]
-                                if attackreward != "":
-                                    print("runningmission")
-                                    message = await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embeds = [embed1, embed2], silent=True)
-                                    await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
-                                else:
-                                    print("runningmission2")
-                                    message = await guild.get_channel(channel).send( f"\n\nMission: {description}\nLocation: {location}", embed = embed2, silent=True)
-                                    await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
-                            attackreward = ""
-                            defendreward = ""
-                            if(embed1 != 0):
-                                embed1.clear_fields()
-                            if(embed1 != 0):
-                                embed2.clear_fields()
+                                    defendimage = mission["defender"]["reward"]["thumbnail"]
+                                embedVar = discord.Embed(title=title, description=node, color=0xffa40d)
+                                if(attackreward != ""): embedVar.add_field(name="Attack Reward", value=attackreward, inline=True)
+                                if(defendreward != ""): embedVar.add_field(name="Defend Reward", value=defendreward, inline=True)
+                                embedVar.set_image(url=defendimage) 
+                                message = await guild.get_channel(channel).send(embeds=[embedVar])
+                                await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
                     await db.commit() 
             await db.close()
-        print("command finished")
+        print("Invasions finished")
         
 
-@tasks.loop(hours=6)
+@tasks.loop(minutes=30)
 async def events_Reset():
     response = requests.get("https://api.warframestat.us/pc/events")
     status = int(response.status_code)
@@ -442,7 +422,6 @@ async def events_Reset():
                 for guild in bot.guilds:
                     await cursor.execute('SELECT channelID from channels where guildID = ? AND channelUse = ?', (guild.id, "events"))
                     data = await cursor.fetchone()
-                    print("Event Data: " + str(data))
                     if data:
                         for x in data:
                             channel = data[0]
@@ -457,7 +436,6 @@ async def events_Reset():
                                 if jsoneventsID == DBID:
                                     matchFound = True
                             if not matchFound:
-                                print("match not found")
                                 stringbase = events["expiry"]
                                 datestring = stringbase.split("T")[0]
                                 timestring = stringbase[:-5].split("T")[1]
@@ -468,12 +446,9 @@ async def events_Reset():
                                 description = "Event: " + events["description"] + " - " + events["tooltip"] + "\nLocation: " + events["node"] + "\nReward: " + events["rewards"][0]["asString"] + "\nEnds: " + f"<t:{int(epochtime)}:R>"
                                 message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
                                 await cursor.execute('INSERT INTO eventsMessages (guildID, channelID, messageID, eventsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoneventsID ))
-                        print("data found")
                     #if there are no news messages in the guild, fill it
                     else:
-                        print("no data:events")
                         for events in response.json():
-                                print("no data:event2")
                                 jsoneventsID = events["id"]
                                 stringbase = events["expiry"]
                                 datestring = stringbase.split("T")[0]
@@ -498,9 +473,10 @@ async def events_Reset():
                            
             await db.commit()
         await db.close()
+        print("events Finished")
 
 
-@tasks.loop(hours = 24)
+@tasks.loop(minutes=30)
 async def clearOldNews():
     channel = 0
     response = requests.get("https://api.warframestat.us/pc/news")
@@ -532,7 +508,7 @@ async def clearOldNews():
             await db.commit()
         await db.close()
 
-@tasks.loop(hours = 24)
+@tasks.loop(minutes=30)
 async def clearOldAlerts():
     channel = 0
     response = requests.get("https://api.warframestat.us/pc/alerts")
@@ -562,7 +538,7 @@ async def clearOldAlerts():
             await db.commit()
         await db.close()
 
-@tasks.loop(hours = 24)
+@tasks.loop(minutes=30)
 async def clearOldInvasions():
     channel = 0
     response = requests.get("https://api.warframestat.us/pc/invasions")
@@ -593,7 +569,7 @@ async def clearOldInvasions():
             await db.commit()
         await db.close()
 
-@tasks.loop(hours = 24)
+@tasks.loop(minutes=30)
 async def clearOldEvents():
     channel = 0
     response = requests.get("https://api.warframestat.us/pc/events")
@@ -696,7 +672,7 @@ async def addPurchase(ctx, item = commands.parameter(description="Must be repres
                 await cursor.execute('SELECT id FROM buyorders WHERE item = ? AND id = ?', (item.lower(), ctx.message.author.id))
                 data = await cursor.fetchone()
                 if data:
-                    print("you have already wishlisted this item")
+                    ctx.send("You have already wishlisted this item")
                 else:
                     await cursor.execute('INSERT INTO buyorders (id, item, price) VALUES (?,?,?)', (ctx.message.author.id, item.lower(), price))
                     await ctx.send("You have added " + item + " to your purchase wishlist for " + price + " platinum")
@@ -719,7 +695,7 @@ async def addSale(ctx, item = commands.parameter(description="Must be represente
             await cursor.execute('SELECT id FROM sellorders WHERE item = ? AND id = ?', (item.lower(), ctx.message.author.id))
             data = await cursor.fetchone()
             if data:
-                print("you have already wishlisted this item")
+                ctx.send("You have already wishlisted this item")
             else:
                 await cursor.execute('INSERT INTO sellorders (id, item, price) VALUES (?,?,?)', (ctx.message.author.id, item.lower(), price))
                 await ctx.send("You have added " + item + " to your sell wishlist for " + price + " platinum")
@@ -771,7 +747,6 @@ async def checkPurchaseOrders():
                     item = order[1]
                     price = order[2]
                     loopInt = 0
-                    print(userID, item, price)
                     response = requests.get(f"https://api.warframe.market/v1/items/{item}/orders")
                     status = int(response.status_code)
                     if status == 200:
@@ -802,7 +777,6 @@ async def checkSellOrders():
                     item = order[1]
                     price = order[2]
                     loopInt = 0
-                    print(userID, item, price)
                     response = requests.get(f"https://api.warframe.market/v1/items/{item}/orders")
                     status = int(response.status_code)
                     if status == 200:
