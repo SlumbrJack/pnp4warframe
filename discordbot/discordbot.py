@@ -125,10 +125,16 @@ class LeaveButtonConfirm(discord.ui.View):
     async def green_button(self,interaction:discord.Interaction,button:discord.ui.Button):
         await interaction.response.edit_message(content="", delete_after=0)
         await testStay()
+    @discord.ui.button(label="Reset Channels", style=discord.ButtonStyle.blurple)
+    async def blurple_button(self,interaction:discord.Interaction,button:discord.ui.Button):
+        await interaction.response.edit_message(content="", delete_after=0)
+        await resetChannels(interaction.guild_id)
+        await setup(interaction.channel_id, interaction.guild_id)
     @discord.ui.button(label="Remove", style=discord.ButtonStyle.red)
     async def red_button(self,interaction:discord.Interaction,button:discord.ui.Button):
         await interaction.response.edit_message(content="", delete_after=0)
-        await testLeave()
+        await resetChannels(interaction.guild_id)
+        await interaction.guild.leave()
     
 
 @bot.command()
@@ -201,50 +207,54 @@ async def setup(channelid, guildid):
             alerts_Reset.restart()
             invasions_Reset.restart()
             events_Reset.restart()
+            checkPurchaseOrders.restart()
+            checkSellOrders.restart()
         else:
             news_Reset.start()
             alerts_Reset.start()
             invasions_Reset.start()
             events_Reset.start()
-    await mainchannel.send("The server is now set up for WarframeBot. Please type !help to learn more. Type \"!help (command name)\" to learn more about a specific command")
+            checkPurchaseOrders.start()
+            checkSellOrders.start()
+    if mainchannel:
+        await mainchannel.send("The server is now set up for WarframeBot. Please type !help to learn more. Type \"!help (command name)\" to learn more about a specific command")
 
 @bot.command(brief='Removes all channels created by the bot', description='This command will remove the channels and categories created by this bot\nOnce complete the bot will leave the server')
 async def removeBotFromServer(ctx):
+    await ctx.send("What would you like to do?", view=LeaveButtonConfirm())
+
+
+async def resetChannels(guildID):
     async with aiosqlite.connect("main2.db", timeout=30) as db:
         async with db.cursor() as cursor:
-            await cursor.execute('SELECT channelID FROM channels WHERE guildID = ?', (ctx.guild.id,))
+            await cursor.execute('SELECT channelID FROM channels WHERE guildID = ?', (guildID,))
             data = await cursor.fetchall()
             if data:
                 for channel in data:
                     await bot.get_channel(channel[0]).delete()
-                await cursor.execute('DELETE FROM channels WHERE guildID = ?', (ctx.guild.id,))
+                await cursor.execute('DELETE FROM channels WHERE guildID = ?', (guildID,))
                 
-            await cursor.execute('SELECT channelID FROM newsMessages where guildID = ?', (ctx.guild.id,))
+            await cursor.execute('SELECT channelID FROM newsMessages where guildID = ?', (guildID,))
             data = await cursor.fetchall()
             if data:
-                await cursor.execute('DELETE FROM newsMessages where guildID = ?', (ctx.guild.id,))
+                await cursor.execute('DELETE FROM newsMessages where guildID = ?', (guildID,))
 
-            await cursor.execute('SELECT channelID FROM alertsMessages where guildID = ?', (ctx.guild.id,))
+            await cursor.execute('SELECT channelID FROM alertsMessages where guildID = ?', (guildID,))
             data = await cursor.fetchall()
             if data:
-                await cursor.execute('DELETE FROM alertsMessages where guildID = ?', (ctx.guild.id,))
+                await cursor.execute('DELETE FROM alertsMessages where guildID = ?', (guildID,))
 
-            await cursor.execute('SELECT channelID FROM eventsMessages where guildID = ?', (ctx.guild.id,))
+            await cursor.execute('SELECT channelID FROM eventsMessages where guildID = ?', (guildID,))
             data = await cursor.fetchall()
             if data:
-                await cursor.execute('DELETE FROM eventsMessages where guildID = ?', (ctx.guild.id,))
+                await cursor.execute('DELETE FROM eventsMessages where guildID = ?', (guildID,))
             
-         
-            await cursor.execute('SELECT channelID FROM invasionsMessages where guildID = ?', (ctx.guild.id,))
+            await cursor.execute('SELECT channelID FROM invasionsMessages where guildID = ?', (guildID,))
             data = await cursor.fetchall()
             if data:
-                await cursor.execute('DELETE FROM invasionsMessages where guildID = ?', (ctx.guild.id,))
-            await ctx.guild.leave()
+                await cursor.execute('DELETE FROM invasionsMessages where guildID = ?', (guildID,))
         await db.commit()
     await db.close()
-
-
-
 
 @tasks.loop(minutes=30)
 async def news_Reset():
@@ -728,24 +738,28 @@ async def on_command_error(ctx,error):
         
         await ctx.send("There was an error using that command, use \"!help (the command you are trying to use)\" to learn more!")    
 '''
-@bot.command(brief= 'Adds an item to a purchase wishlist', description = 'Adds an item you would like to purchase to a wish list.\nWhen a sell order is placed on WarframeMarket for less than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addPurchase nezha_price_neuroptics 20')
+@bot.command(brief= 'Adds an item to a purchase wishlist', description = 'Adds an item you would like to purchase to a wish list.\nWhen a sell order is placed on WarframeMarket for less than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addPurchase nezha_prime_neuroptics_blueprint 20')
 async def addPurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")): 
+    response = requests.get(f"https://api.warframe.market/v1/items/{item}/orders")
+    status = int(response.status_code)
     if not price.isdigit():
         await ctx.send("There was an error using that command, use \"!help (the command you are trying to use)\" to learn more!")
+    elif status != 200:
+        await ctx.send("There was an error using that command, you may have type the item name incorrectly. Use \"!help (the command you are trying to use)\" to learn more!")
     else:
         async with aiosqlite.connect("main2.db") as db:
             async with db.cursor() as cursor:
                 await cursor.execute('SELECT id FROM buyorders WHERE item = ? AND id = ?', (item.lower(), ctx.message.author.id))
                 data = await cursor.fetchone()
                 if data:
-                    ctx.send("You have already wishlisted this item")
+                    await ctx.send("You have already wishlisted this item")
                 else:
                     await cursor.execute('INSERT INTO buyorders (id, item, price) VALUES (?,?,?)', (ctx.message.author.id, item.lower(), price))
                     await ctx.send("You have added " + item + " to your purchase wishlist for " + price + " platinum")
             await db.commit()
         await db.close()
 
-@bot.command(brief= 'Removes an item from the purchase wishlist', description= 'Removes an item from your purchase wishlist.\nYou will no longer receive messages about this item. Example usage: !removePurchase nidus_prime_chassis') 
+@bot.command(brief= 'Removes an item from the purchase wishlist', description= 'Removes an item from your purchase wishlist.\nYou will no longer receive messages about this item. Example usage: !removePurchase nidus_prime_chassis_blueprint') 
 async def removePurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems")):
     async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
@@ -754,21 +768,28 @@ async def removePurchase(ctx, item = commands.parameter(description="Must be rep
         await db.commit()
     await db.close()
 
-@bot.command(brief= 'Adds an item to a sell wishlist', description = 'Adds an item you would like to sell to a wish list.\nWhen a buy order is placed on WarframeMarket for more than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addSale nezha_price_neuroptics 10')
+@bot.command(brief= 'Adds an item to a sell wishlist', description = 'Adds an item you would like to sell to a wish list.\nWhen a buy order is placed on WarframeMarket for more than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addSale nezha_prime_neuroptics_blueprint 10')
 async def addSale(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")):
-    async with aiosqlite.connect("main2.db") as db:
-        async with db.cursor() as cursor:
-            await cursor.execute('SELECT id FROM sellorders WHERE item = ? AND id = ?', (item.lower(), ctx.message.author.id))
-            data = await cursor.fetchone()
-            if data:
-                ctx.send("You have already wishlisted this item")
-            else:
-                await cursor.execute('INSERT INTO sellorders (id, item, price) VALUES (?,?,?)', (ctx.message.author.id, item.lower(), price))
-                await ctx.send("You have added " + item + " to your sell wishlist for " + price + " platinum")
-        await db.commit()
-    await db.close()
+    response = requests.get(f"https://api.warframe.market/v1/items/{item}/orders")
+    status = int(response.status_code)
+    if not price.isdigit():
+        await ctx.send("There was an error using that command, use \"!help (the command you are trying to use)\" to learn more!")
+    elif status != 200:
+        await ctx.send("There was an error using that command, you may have type the item name incorrectly. Use \"!help (the command you are trying to use)\" to learn more!")
+    else:
+        async with aiosqlite.connect("main2.db") as db:
+            async with db.cursor() as cursor:
+                await cursor.execute('SELECT id FROM sellorders WHERE item = ? AND id = ?', (item.lower(), ctx.message.author.id))
+                data = await cursor.fetchone()
+                if data:
+                    await ctx.send("You have already wishlisted this item")
+                else:
+                    await cursor.execute('INSERT INTO sellorders (id, item, price) VALUES (?,?,?)', (ctx.message.author.id, item.lower(), price))
+                    await ctx.send("You have added " + item + " to your sell wishlist for " + price + " platinum")
+            await db.commit()
+        await db.close()
 
-@bot.command(brief= 'Removes an item from the sell wishlist', description= 'Removes an item from your sale wishlist.\nYou will no longer receive messages about this item. Example usage: !removeSale nidus_prime_chassis')
+@bot.command(brief= 'Removes an item from the sell wishlist', description= 'Removes an item from your sale wishlist.\nYou will no longer receive messages about this item. Example usage: !removeSale nidus_prime_chassis_blueprint')
 async def removeSale(ctx, item):
     async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
@@ -780,24 +801,69 @@ async def removeSale(ctx, item):
 @bot.command(brief="Shows a list of your wishlisted items", description="Shows a list of your purchase and sell wishlisted items.")
 async def wishlist(ctx):
     message = ""
+    embedVar = discord.Embed(title="Wishlist", description=f"", color=0x660066)
     async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
-            await cursor.execute('SELECT item FROM buyorders WHERE id = ?', (ctx.author.id,))
+            await cursor.execute('SELECT item, price FROM buyorders WHERE id = ?', (ctx.author.id,))
+            data = await cursor.fetchall()
+        
+            if data:
+                items = ""
+                prices = ""
+                for x in data:
+                    items  += (x[0] + "\n")
+                    prices += (str(x[1]) + "\n")
+            embedVar.add_field(name="Purchases", value=items, inline=True)
+            embedVar.add_field(name="Prices", value=prices, inline=True)
+            await cursor.execute('SELECT item, price FROM sellorders WHERE id = ?', (ctx.author.id,))
             data = await cursor.fetchall()
             if data:
-                message += ("Purchase:\n")
+                items = ""
+                prices = ""
                 for x in data:
-                    message  += (x[0] + "\n")
-            await cursor.execute('SELECT item FROM sellorders WHERE id = ?', (ctx.author.id,))
-            data = await cursor.fetchall()
-            if data:
-                message += ("Sell:\n")
-                for x in data:
-                    message += (x[0] + "\n")
-            await ctx.send(message)
+                    items  += (x[0] + "\n")
+                    prices += (str(x[1]) + "\n")
+            embedVar.add_field(name="",value="", inline=False)
+            embedVar.add_field(name="Sales", value=items, inline=True)
+            embedVar.add_field(name="Prices", value=prices, inline=True)
+            await ctx.send(embed=embedVar)
     await db.close()
 
-@tasks.loop(minutes = 7)
+class RemoveFromPurchaseWishlistButton(discord.ui.View):
+    def __init__(self, *, timeout=180):
+        super().__init__(timeout=timeout)
+    @discord.ui.button(label="Remove From Wishlist?",style=discord.ButtonStyle.red)
+    async def red_button(self,interaction:discord.Interaction,button:discord.ui.Button):
+        await interaction.response.edit_message(content="", delete_after=0)
+        await removePurchaseButton(interaction.message.content.split(" ")[-4], interaction.user.id)
+        await interaction.channel.send("This item has been removed")
+
+async def removePurchaseButton(item, authorID):
+    async with aiosqlite.connect("main2.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('DELETE FROM buyorders WHERE item = ? AND id = ?',  (item.lower(), authorID))
+            #await ctx.send("You have removed " + item + " from your sell wishlist")
+        await db.commit()
+    await db.close()
+
+class RemoveFromSaleWishlistButton(discord.ui.View):
+    def __init__(self, *, timeout=180):
+        super().__init__(timeout=timeout)
+    @discord.ui.button(label="Remove From Wishlist??",style=discord.ButtonStyle.red)
+    async def red_button(self,interaction:discord.Interaction,button:discord.ui.Button):
+        await interaction.response.edit_message(content="", delete_after=0)
+        await removeSaleButton(interaction.message.content.split(" ")[-4], interaction.user.id)
+        await interaction.channel.send("This item has been removed")
+
+async def removeSaleButton(item, authorID):
+    async with aiosqlite.connect("main2.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('DELETE FROM sellorders WHERE item = ? AND id = ?',  (item.lower(), authorID))
+            #await ctx.send("You have removed " + item + " from your sell wishlist")
+        await db.commit()
+    await db.close()
+
+@tasks.loop(minutes = 1)
 async def checkPurchaseOrders():
     if checkPurchaseOrders.current_loop ==0:
         return
@@ -822,12 +888,13 @@ async def checkPurchaseOrders():
                             if x["visible"] == True and x["order_type"] == "sell" and x["platinum"] <= price:
                                 channel = await bot.get_user(userID).create_dm()
                                 await channel.send("The item you wishlisted: " + item + " is on sale for your asking price (or less!)")
+                                await channel.send(f"Would you like to remove {item} from your wishlist?",view=RemoveFromPurchaseWishlistButton())
                                 print("looped " + str(loopInt) + " times")
                                 break
             await db.commit()
     await db.close()
 
-@tasks.loop(minutes = 15)
+@tasks.loop(minutes = 1)
 async def checkSellOrders():
     if checkSellOrders.current_loop ==0:
         return
@@ -852,6 +919,7 @@ async def checkSellOrders():
                             if x["visible"] == True and x["order_type"] == "buy" and x["platinum"] >= price:
                                 channel = await bot.get_user(userID).create_dm()
                                 await channel.send("The item you wishlisted: " + item + " is being requested for your asking price (or more!)")
+                                await channel.send(f"Would you like to remove {item} from your wishlist?",view=RemoveFromSaleWishlistButton())
                                 print("looped " + str(loopInt) + " times")
                                 break
             await db.commit()
