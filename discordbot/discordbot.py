@@ -677,32 +677,86 @@ async def clearOldEvents():
         await db.close()
 
      
-                        
+@bot.command()
+async def cyclesTest(ctx):
+    inString = "1h 9m 0s"
+    addtime = 0
+    timeList = inString.split(" ")
+    for x in timeList:
+        if x[-1] == 'h':
+            addtime += (3600 * int(x[:-1]))
+        elif x[-1] == 'm':
+            addtime += (60 * int(x[:-1]))
+        else:
+            addtime += int(x[:-1])
+    epochtime = time.time() + addtime
+    await ctx.send(f"<t:{int(epochtime)}:R>")
+    '''
+    jsoneventsID = events["id"]
+    stringbase = events["expiry"]
+    datestring = stringbase.split("T")[0]
+    timestring = stringbase[:-5].split("T")[1]
+    datetimestring = f"{datestring}-{timestring}"
+    timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+    epochtime = time.mktime(timeobj.timetuple())
+    '''
 
 @bot.command(brief='Lists cycles for open zones', description= 'Lists the current cycles for Cetus, Orb Vallis, and Cambion Drift')
 async def cycles(ctx):
     requests.patch(url="https://discord.com/api/v9/users/@warframebot", headers= {"authorization": bot_token}, json = {"bio": "TestBot Bio"} )
     response = requests.get("https://api.warframestat.us/pc/cetusCycle")
     status = int(response.status_code)
+    embedVar = discord.Embed(title="World Cycles", description=f"", color=0x660066)
     if status == 200:
-        stringbase = response.json()["shortString"]
+        inString = response.json()["timeLeft"]
         cycleStatus = response.json()["state"]
-        await ctx.send("It is currently: " + cycleStatus + " in Cetus\n" + stringbase)
+        addtime = 0
+        timeList = inString.split(" ")
+        for x in timeList:
+            if x[-1] == 'h':
+                addtime += (3600 * int(x[:-1]))
+            elif x[-1] == 'm':
+                addtime += (60 * int(x[:-1]))
+            else:
+                addtime += int(x[:-1])
+        epochtime = time.time() + addtime
+        embedVar.add_field(name="Cetus", value=f"Currently is {cycleStatus}\nChanges <t:{int(epochtime)}:R>", inline=True)
 
 
     response = requests.get("https://api.warframestat.us/pc/vallisCycle")
     status = int(response.status_code)
     if status == 200:
-        stringbase = response.json()["shortString"]
+        inString = response.json()["timeLeft"]
         cycleStatus = response.json()["state"]
-        await ctx.send("It is currently: " + cycleStatus + " in Orb Vallis\n" + stringbase)
+        addtime = 0
+        timeList = inString.split(" ")
+        for x in timeList:
+            if x[-1] == 'h':
+                addtime += (3600 * int(x[:-1]))
+            elif x[-1] == 'm':
+                addtime += (60 * int(x[:-1]))
+            else:
+                addtime += int(x[:-1])
+        epochtime = time.time() + addtime
+        embedVar.add_field(name="Orb Vallis", value=f"Currently is {cycleStatus}\nChanges <t:{int(epochtime)}:R>", inline=True)
 
     response = requests.get("https://api.warframestat.us/pc/cambionCycle")
     status = int(response.status_code)
     if status == 200:
-        stringbase = response.json()["timeLeft"]
+        inString = response.json()["timeLeft"]
         cycleStatus = response.json()["state"]
-        await ctx.send("It is currently: " + cycleStatus + " in Cambion Drift\n" + stringbase)
+        addtime = 0
+        timeList = inString.split(" ")
+        for x in timeList:
+            if x[-1] == 'h':
+                addtime += (3600 * int(x[:-1]))
+            elif x[-1] == 'm':
+                addtime += (60 * int(x[:-1]))
+            else:
+                addtime += int(x[:-1])
+        epochtime = time.time() + addtime
+        embedVar.add_field(name="Cambion Drift", value=f"Currently is {cycleStatus}\nChanges <t:{int(epochtime)}:R>", inline=True)
+    await ctx.send(embed=embedVar)
 
 @bot.command(brief='Information on the Void Trader', description='')
 async def baro(ctx):
@@ -798,23 +852,35 @@ async def removeSale(ctx, item):
         await db.commit()
     await db.close()
 
+@bot.command(brief="Clears your wishlist", description="Removes all times from your purchase and sale wishlist.")
+async def clearWishlist(ctx):
+    async with aiosqlite.connect("main2.db") as db:
+        async with db.cursor() as cursor:
+            await cursor.execute('DELETE FROM sellorders WHERE id = ?',  (ctx.message.author.id,))
+        await db.commit()
+        async with db.cursor() as cursor:
+            await cursor.execute('DELETE FROM buyorders WHERE id = ?',  (ctx.message.author.id,))
+        await db.commit()
+    await db.close()
+    await ctx.send("Your wishlist has been cleared")
+
+
 @bot.command(brief="Shows a list of your wishlisted items", description="Shows a list of your purchase and sell wishlisted items.")
 async def wishlist(ctx):
-    message = ""
     embedVar = discord.Embed(title="Wishlist", description=f"", color=0x660066)
     async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('SELECT item, price FROM buyorders WHERE id = ?', (ctx.author.id,))
             data = await cursor.fetchall()
-        
             if data:
                 items = ""
                 prices = ""
                 for x in data:
                     items  += (x[0] + "\n")
                     prices += (str(x[1]) + "\n")
-            embedVar.add_field(name="Purchases", value=items, inline=True)
-            embedVar.add_field(name="Prices", value=prices, inline=True)
+                embedVar.add_field(name="Purchases", value=items, inline=True)
+                embedVar.add_field(name="Prices", value=prices, inline=True)
+
             await cursor.execute('SELECT item, price FROM sellorders WHERE id = ?', (ctx.author.id,))
             data = await cursor.fetchall()
             if data:
@@ -823,9 +889,9 @@ async def wishlist(ctx):
                 for x in data:
                     items  += (x[0] + "\n")
                     prices += (str(x[1]) + "\n")
-            embedVar.add_field(name="",value="", inline=False)
-            embedVar.add_field(name="Sales", value=items, inline=True)
-            embedVar.add_field(name="Prices", value=prices, inline=True)
+                embedVar.add_field(name="",value="", inline=False)
+                embedVar.add_field(name="Sales", value=items, inline=True)
+                embedVar.add_field(name="Prices", value=prices, inline=True)
             await ctx.send(embed=embedVar)
     await db.close()
 
