@@ -94,9 +94,9 @@ async def on_ready():
                 if(data):
                     for x in data:
                         if guild.id not in x:
-                            await guild.system_channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=Buttons())
+                            await guild.system_channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=SetupButtons())
                 else:
-                    await guild.system_channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=Buttons())
+                    await guild.system_channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=SetupButtons())
             
                 
 
@@ -108,9 +108,9 @@ async def on_ready():
 async def on_guild_join(guild):
     print("joined server")
     channel =  guild.system_channel
-    await channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=Buttons())
+    await channel.send("Hello, I am WarframeBot. Click below to setup this bot!", view=SetupButtons())
 
-class Buttons(discord.ui.View):
+class SetupButtons(discord.ui.View):
     def __init__(self, *, timeout=180):
         super().__init__(timeout=timeout)
     @discord.ui.button(label="Set Up",style=discord.ButtonStyle.blurple)
@@ -118,6 +118,26 @@ class Buttons(discord.ui.View):
         await interaction.response.edit_message(content="", delete_after=1)
         await setup(interaction.channel_id, interaction.guild_id)
 
+class LeaveButtonConfirm(discord.ui.View):
+    def __init__(self, *, timeout=180):
+        super().__init__(timeout=timeout)
+    @discord.ui.button(label="Keep", style=discord.ButtonStyle.green)
+    async def green_button(self,interaction:discord.Interaction,button:discord.ui.Button):
+        await interaction.response.edit_message(content="", delete_after=0)
+        await testStay()
+    @discord.ui.button(label="Remove", style=discord.ButtonStyle.red)
+    async def red_button(self,interaction:discord.Interaction,button:discord.ui.Button):
+        await interaction.response.edit_message(content="", delete_after=0)
+        await testLeave()
+    
+
+@bot.command()
+async def testRemove(ctx):
+    await ctx.send("Remove WarframeBot?", view=LeaveButtonConfirm())
+async def testLeave():
+    print("I left!")
+async def testStay():
+    print("I stayed!")
 @bot.command()    
 async def testInvasionButtons(ctx):
     response = requests.get("https://api.warframestat.us/pc/invasions")
@@ -221,6 +241,9 @@ async def removeBotFromServer(ctx):
                 await cursor.execute('DELETE FROM invasionsMessages where guildID = ?', (ctx.guild.id,))
             await ctx.guild.leave()
         await db.commit()
+    await db.close()
+
+
 
 
 @tasks.loop(minutes=30)
@@ -318,10 +341,16 @@ async def alerts_Reset():
                                 datetimestring = f"{datestring}-{timestring}"
                                 timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
                                 epochtime = time.mktime(timeobj.timetuple())
-                                description = alerts["mission"]["nodeKey"] + ": " + alerts["mission"]["levelOverride"] + "\nReward: " + alerts["mission"]["reward"]["asString"] + "\nEnds: " + f"<t:{int(epochtime)}:R>"
-                                
-                                
-                                message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
+                
+                                description = alerts["mission"]["levelOverride"]
+                                location = alerts["mission"]["nodeKey"]
+                                rewards = alerts["mission"]["reward"]["asString"]
+                                end = f"<t:{int(epochtime)}:R>"
+                                embedVar = discord.Embed(title=description, description=f"<t:{int(epochtime)}:R>", color=0x6699ff)
+                                embedVar.add_field(name="Location", value=location, inline=False)
+                                embedVar.add_field(name="Rewards", value=rewards, inline=True)
+                                embedVar.add_field(name="Ends", value=end)
+                                message = await guild.get_channel(channel).send(embeds=[embedVar],silent=True)
                                 await cursor.execute('INSERT INTO alertsMessages (guildID, channelID, messageID, alertsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsonAlertsID ))
                     #if there are no news messages in the guild, fill it
                     else:
@@ -333,8 +362,16 @@ async def alerts_Reset():
                                 datetimestring = f"{datestring}-{timestring}"
                                 timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
                                 epochtime = time.mktime(timeobj.timetuple())
-                                description = alerts["mission"]["nodeKey"] + ": " + alerts["mission"]["levelOverride"] + "\nReward: " + alerts["mission"]["reward"]["asString"] + "\nEnds: " + f"<t:{int(epochtime)}:R>"
-                                message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
+                
+                                description = alerts["mission"]["levelOverride"]
+                                location = alerts["mission"]["nodeKey"]
+                                rewards = alerts["mission"]["reward"]["asString"]
+                                end = f"<t:{int(epochtime)}:R>"
+                                embedVar = discord.Embed(title=description, description=f"", color=0x6699ff)
+                                embedVar.add_field(name="Location", value=location, inline=False)
+                                embedVar.add_field(name="Rewards", value=rewards, inline=True)
+                                embedVar.add_field(name="Ends", value=end)
+                                message = await guild.get_channel(channel).send(embeds=[embedVar],silent=True)
                                 await cursor.execute('INSERT INTO alertsMessages (guildID, channelID, messageID, alertsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsonAlertsID ))
 
 
@@ -442,9 +479,25 @@ async def events_Reset():
                                 datetimestring = f"{datestring}-{timestring}"
                                 timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
                                 epochtime = time.mktime(timeobj.timetuple())
-                                #description = events["mission"]["nodeKey"] + ": " + events["mission"]["levelOverride"] + "\nReward: " + events["mission"]["reward"]["asString"] + "\nEnds: " + events["eta"]
-                                description = "Event: " + events["description"] + " - " + events["tooltip"] + "\nLocation: " + events["node"] + "\nReward: " + events["rewards"][0]["asString"] + "\nEnds: " + f"<t:{int(epochtime)}:R>"
-                                message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
+
+                                description = events["tooltip"]
+                                node = ""
+                                if("node" in events):
+                                    node = events["node"]
+                                elif("victimNode" in events):
+                                    node = events["victimNode"]
+                                rewards = ""
+                                if(len(events["rewards"]) != 0):
+                                    rewards = events["rewards"][0]["asString"]
+                                img = ""
+                                if events["rewards"][0]["thumbnail"] != "": img = events["rewards"][0]["thumbnail"]
+                                end = f"<t:{int(epochtime)}:R>"
+                                embedVar = discord.Embed(title=description, description=f"", color=0xffff99)
+                                embedVar.add_field(name="Location", value=node, inline=False)
+                                embedVar.add_field(name="Rewards", value=rewards, inline=True)
+                                embedVar.add_field(name="Ends", value=end)
+                                if img != "": embedVar.set_image(url=img)
+                                message = await guild.get_channel(channel).send(embeds=[embedVar],silent=True)
                                 await cursor.execute('INSERT INTO eventsMessages (guildID, channelID, messageID, eventsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoneventsID ))
                     #if there are no news messages in the guild, fill it
                     else:
@@ -456,16 +509,26 @@ async def events_Reset():
                                 datetimestring = f"{datestring}-{timestring}"
                                 timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
                                 epochtime = time.mktime(timeobj.timetuple())
+                                description = events["tooltip"]
                                 node = ""
                                 if("node" in events):
-                                    node = "\nLocation: " +events["node"]
+                                    node = events["node"]
                                 elif("victimNode" in events):
-                                    node = "\nLocation: " +events["victimNode"]
+                                    node = events["victimNode"]
                                 rewards = ""
+                                img = ""
                                 if(len(events["rewards"]) != 0):
-                                    rewards = "\nReward: " + events["rewards"][0]["asString"]
-                                description = "Event: " + events["description"] + " - " + events["tooltip"] +  node + rewards + "\nEnds: " + f"<t:{int(epochtime)}:R>"
-                                message = await guild.get_channel(channel).send(f"\n\n{description}",silent=True)
+                                    rewards = events["rewards"][0]["asString"]
+                                    if events["rewards"][0]["thumbnail"] != "": img = events["rewards"][0]["thumbnail"]
+                                
+                                
+                                end = f"<t:{int(epochtime)}:R>"
+                                embedVar = discord.Embed(title=description, description=f"", color=0xffff99)
+                                embedVar.add_field(name="Location", value=node, inline=False)
+                                if rewards != "": embedVar.add_field(name="Rewards", value=rewards, inline=True)
+                                embedVar.add_field(name="Ends", value=end)
+                                if img != "": embedVar.set_image(url=img)
+                                message = await guild.get_channel(channel).send(embeds=[embedVar],silent=True)
                                 await cursor.execute('INSERT INTO eventsMessages (guildID, channelID, messageID, eventsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoneventsID ))
 
 
