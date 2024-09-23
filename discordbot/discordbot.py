@@ -152,6 +152,9 @@ async def setup(channelid, guildid):
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(send_messages=False)
     }
+    overwritesOpen = {
+        guild.default_role: discord.PermissionOverwrite(send_messages=True)
+    }
     async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             
@@ -166,7 +169,7 @@ async def setup(channelid, guildid):
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "events"))
             channel = await guild.create_text_channel("warframe-invasions", overwrites = overwrites, category = category)
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "invasions"))
-            channel = await guild.create_text_channel("warframe-cycles", overwrites = overwrites, category = category)
+            channel = await guild.create_text_channel("warframe-cycles", category = category)
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "cycles"))
             channel = await guild.create_text_channel("warframe-market", category = category)
             await cursor.execute('INSERT INTO channels (guildID, channelID, channelUse) VALUES (?,?,?)', (guild.id, channel.id, "market"))
