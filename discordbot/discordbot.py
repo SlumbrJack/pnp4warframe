@@ -137,38 +137,11 @@ class LeaveButtonConfirm(discord.ui.View):
         await interaction.guild.leave()
     
 
-@bot.command()
-async def testRemove(ctx):
-    await ctx.send("Remove WarframeBot?", view=LeaveButtonConfirm())
 async def testLeave():
     print("I left!")
 async def testStay():
     print("I stayed!")
-@bot.command()    
-async def testInvasionButtons(ctx):
-    response = requests.get("https://api.warframestat.us/pc/invasions")
-    status = int(response.status_code)
-    newsDict = {}
-    if status == 200:
-        for mission in response.json():
-            jsonInvasionID = mission["id"]
-            title = mission["desc"]
-            node = mission["node"]
-            attackreward = ""
-            defendreward = ""
-            defendimage = ""
-            if "reward" in mission["attacker"]:
-                attackreward = mission["attacker"]["reward"]["asString"]
-                attackimage = mission["attacker"]["reward"]["thumbnail"]
-            if "reward" in mission["defender"]:
-                defendreward = mission["defender"]["reward"]["asString"]
-                defendimage = mission["defender"]["reward"]["thumbnail"]
-            embedVar = discord.Embed(title=title, description=node, color=0xffa40d)
-            if(attackreward != ""): embedVar.add_field(name="Attack Reward", value=attackreward, inline=True)
-            if(defendreward != ""): embedVar.add_field(name="Defend Reward", value=defendreward, inline=True)
-            embedVar.set_image(url=defendimage) 
-            await ctx.send(embeds=[embedVar])
-            
+
 
 
 #@bot.command(brief='Sets up the server by adding new channels', description='This command will add new channels under a new category to the server.\nWARNING: DO NO RUN THIS COMMAND MULTIPLE TIMES. DO NOT DELETE THISE CHANNELS WITHOUT USING THE CORRECT COMMAND')
@@ -431,7 +404,7 @@ async def invasions_Reset():
                                     if(attackreward != ""): embedVar.add_field(name="Attack Reward", value=attackreward, inline=True)
                                     if(defendreward != ""): embedVar.add_field(name="Defend Reward", value=defendreward, inline=True)
                                     embedVar.set_image(url=defendimage) 
-                                    message = await guild.get_channel(channel).send(embeds=[embedVar])
+                                    message = await guild.get_channel(channel).send(embeds=[embedVar],silent=True)
                                     await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
                     else:
                         for mission in response.json(): 
@@ -451,7 +424,7 @@ async def invasions_Reset():
                                 if(attackreward != ""): embedVar.add_field(name="Attack Reward", value=attackreward, inline=True)
                                 if(defendreward != ""): embedVar.add_field(name="Defend Reward", value=defendreward, inline=True)
                                 embedVar.set_image(url=defendimage) 
-                                message = await guild.get_channel(channel).send(embeds=[embedVar])
+                                message = await guild.get_channel(channel).send(embeds=[embedVar],silent=True)
                                 await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
                     await db.commit() 
             await db.close()
@@ -676,30 +649,6 @@ async def clearOldEvents():
             await db.commit()
         await db.close()
 
-     
-@bot.command()
-async def cyclesTest(ctx):
-    inString = "1h 9m 0s"
-    addtime = 0
-    timeList = inString.split(" ")
-    for x in timeList:
-        if x[-1] == 'h':
-            addtime += (3600 * int(x[:-1]))
-        elif x[-1] == 'm':
-            addtime += (60 * int(x[:-1]))
-        else:
-            addtime += int(x[:-1])
-    epochtime = time.time() + addtime
-    await ctx.send(f"<t:{int(epochtime)}:R>")
-    '''
-    jsoneventsID = events["id"]
-    stringbase = events["expiry"]
-    datestring = stringbase.split("T")[0]
-    timestring = stringbase[:-5].split("T")[1]
-    datetimestring = f"{datestring}-{timestring}"
-    timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
-    epochtime = time.mktime(timeobj.timetuple())
-    '''
 
 @bot.command(brief='Lists cycles for open zones', description= 'Lists the current cycles for Cetus, Orb Vallis, and Cambion Drift')
 async def cycles(ctx):
