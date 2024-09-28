@@ -196,7 +196,7 @@ async def setup(channelid, guildid):
         await mainchannel.send("The server is now set up for WarframeBot. Please type !help to learn more. Type \"!help (command name)\" to learn more about a specific command")
 
 @bot.command(brief='Removes all channels created by the bot', description='This command will remove the channels and categories created by this bot\nOnce complete the bot will leave the server')
-async def removeBotFromServer(ctx):
+async def removebotfromserver(ctx):
     await ctx.send("What would you like to do?", view=LeaveButtonConfirm())
 
 
@@ -745,8 +745,8 @@ async def on_command_error(ctx,error):
         await ctx.send("There was an error using that command, use \"!help (the command you are trying to use)\" to learn more!")    
 '''
 @bot.command(brief= 'Adds an item to a purchase wishlist', description = 'Adds an item you would like to purchase to a wish list.\nWhen a sell order is placed on WarframeMarket for less than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addPurchase nezha_prime_neuroptics_blueprint 20')
-async def addPurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")): 
-    response = requests.get(f"https://api.warframe.market/v1/items/{item}/orders")
+async def addpurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")): 
+    response = requests.get(f"https://api.warframe.market/v1/items/{item.tolower()}/orders")
     status = int(response.status_code)
     if not price.isdigit():
         await ctx.send("There was an error using that command, use \"!help (the command you are trying to use)\" to learn more!")
@@ -766,7 +766,7 @@ async def addPurchase(ctx, item = commands.parameter(description="Must be repres
         await db.close()
 
 @bot.command(brief= 'Removes an item from the purchase wishlist', description= 'Removes an item from your purchase wishlist.\nYou will no longer receive messages about this item. Example usage: !removePurchase nidus_prime_chassis_blueprint') 
-async def removePurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems")):
+async def removepurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems")):
     async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('DELETE FROM buyorders WHERE item = ? AND id = ?',  (item.lower(), ctx.message.author.id))
@@ -775,8 +775,8 @@ async def removePurchase(ctx, item = commands.parameter(description="Must be rep
     await db.close()
 
 @bot.command(brief= 'Adds an item to a sell wishlist', description = 'Adds an item you would like to sell to a wish list.\nWhen a buy order is placed on WarframeMarket for more than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addSale nezha_prime_neuroptics_blueprint 10')
-async def addSale(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")):
-    response = requests.get(f"https://api.warframe.market/v1/items/{item}/orders")
+async def addsale(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")):
+    response = requests.get(f"https://api.warframe.market/v1/items/{item.tolower()}/orders")
     status = int(response.status_code)
     if not price.isdigit():
         await ctx.send("There was an error using that command, use \"!help (the command you are trying to use)\" to learn more!")
@@ -796,7 +796,7 @@ async def addSale(ctx, item = commands.parameter(description="Must be represente
         await db.close()
 
 @bot.command(brief= 'Removes an item from the sell wishlist', description= 'Removes an item from your sale wishlist.\nYou will no longer receive messages about this item. Example usage: !removeSale nidus_prime_chassis_blueprint')
-async def removeSale(ctx, item):
+async def removesale(ctx, item):
     async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('DELETE FROM sellorders WHERE item = ? AND id = ?',  (item.lower(), ctx.message.author.id))
@@ -805,7 +805,7 @@ async def removeSale(ctx, item):
     await db.close()
 
 @bot.command(brief="Clears your wishlist", description="Removes all times from your purchase and sale wishlist.")
-async def clearWishlist(ctx):
+async def clearwishlist(ctx):
     async with aiosqlite.connect("main2.db") as db:
         async with db.cursor() as cursor:
             await cursor.execute('DELETE FROM sellorders WHERE id = ?',  (ctx.message.author.id,))
