@@ -325,12 +325,7 @@ async def news_Reset():
                                 else:
                                     epochtime = time.time() + addtime   
 
-                                #stringbase = news["date"]
-                                #datestring = stringbase.split("T")[0]
-                                #timestring = stringbase[:-5].split("T")[1]
-                                #datetimestring = f"{datestring}-{timestring}"
-                                #timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
-                                #epochtime = time.mktime(timeobj.timetuple())
+
                                 embedVar = discord.Embed(title=description, description=f"<t:{int(epochtime)}:R>", color=0x00ff00)
                                 embedVar.add_field(name="", value=f"[Link]({link})", inline=False)
                                 embedVar.set_image(url=news["imageLink"]) 
@@ -871,7 +866,7 @@ async def on_command_error(ctx,error):
 '''
 @bot.command(brief= 'Adds an item to a purchase wishlist', description = 'Adds an item you would like to purchase to a wish list.\nWhen a sell order is placed on WarframeMarket for less than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addPurchase nezha_prime_neuroptics_blueprint 20')
 async def addpurchase(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")): 
-    response = requests.get(f"https://api.warframe.market/v1/items/{item.tolower()}/orders")
+    response = requests.get(f"https://api.warframe.market/v1/items/{item.lower()}/orders")
     status = int(response.status_code)
     if not price.isdigit():
         await ctx.send("There was an error using that command, use \"!help (the command you are trying to use)\" to learn more!")
@@ -901,7 +896,7 @@ async def removepurchase(ctx, item = commands.parameter(description="Must be rep
 
 @bot.command(brief= 'Adds an item to a sell wishlist', description = 'Adds an item you would like to sell to a wish list.\nWhen a buy order is placed on WarframeMarket for more than or equal to your desired price, you will recieve a DM letting you know.\nExample usage: !addSale nezha_prime_neuroptics_blueprint 10')
 async def addsale(ctx, item = commands.parameter(description="Must be represented in this format: mirage_prime_systems"), price = commands.parameter(description="The price (in platinum) you are looking to buy this item for")):
-    response = requests.get(f"https://api.warframe.market/v1/items/{item.tolower()}/orders")
+    response = requests.get(f"https://api.warframe.market/v1/items/{item.lower()}/orders")
     status = int(response.status_code)
     if not price.isdigit():
         await ctx.send("There was an error using that command, use \"!help (the command you are trying to use)\" to learn more!")
