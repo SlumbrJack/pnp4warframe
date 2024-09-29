@@ -253,12 +253,36 @@ async def news_Reset():
                         for news in response.json():
                             jsonNewsID = news["id"]
                             matchFound = False
-                            stringbase = news["date"]
-                            datestring = stringbase.split("T")[0]
-                            timestring = stringbase[:-5].split("T")[1]
-                            datetimestring = f"{datestring}-{timestring}"
-                            timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
-                            epochtime = time.mktime(timeobj.timetuple())
+
+
+                            inString = news["eta"]
+                            addtime = 0
+                            timeList = inString.split(" ")
+                            for x in timeList:
+                                if x == "in" or x == "ago":
+                                    pass
+                                elif x[-1] == 'd':
+                                    addtime += (86400 * int(x[:-1]))
+                                elif x[-1] == 'h':
+                                    addtime += (3600 * int(x[:-1]))
+                                elif x[-1] == 'm':
+                                    addtime += (60 * int(x[:-1]))
+                                else:
+                                    addtime += int(x[:-1])
+                            if timeList[0] == "in":
+                                epochtime = time.time() + addtime  
+                            elif timeList[-1] == "ago":
+                                epochtime = time.time() - addtime  
+                            else:
+                                epochtime = time.time() + addtime 
+
+
+                            #stringbase = news["date"]
+                            #datestring = stringbase.split("T")[0]
+                            #timestring = stringbase[:-5].split("T")[1]
+                            #datetimestring = f"{datestring}-{timestring}"
+                            #timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+                            #epochtime = time.mktime(timeobj.timetuple())
                             #await ctx.send(f"<t:{int(epochtime)}:R>")
                             for x in data:
                                 DBID = x[0] 
@@ -279,12 +303,34 @@ async def news_Reset():
                                 newsID = news["id"]
                                 description = news["message"]
                                 link = news["link"]
-                                stringbase = news["date"]
-                                datestring = stringbase.split("T")[0]
-                                timestring = stringbase[:-5].split("T")[1]
-                                datetimestring = f"{datestring}-{timestring}"
-                                timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
-                                epochtime = time.mktime(timeobj.timetuple())
+                                
+                                inString = news["eta"]
+                                addtime = 0
+                                timeList = inString.split(" ")
+                                for x in timeList:
+                                    if x == "in" or x == "ago":
+                                        pass
+                                    elif x[-1] == 'd':
+                                        addtime += (86400 * int(x[:-1]))
+                                    elif x[-1] == 'h':
+                                        addtime += (3600 * int(x[:-1]))
+                                    elif x[-1] == 'm':
+                                        addtime += (60 * int(x[:-1]))
+                                    else:
+                                        addtime += int(x[:-1])
+                                if timeList[0] == "in":
+                                    epochtime = time.time() + addtime  
+                                elif timeList[-1] == "ago":
+                                    epochtime = time.time() - addtime  
+                                else:
+                                    epochtime = time.time() + addtime   
+
+                                #stringbase = news["date"]
+                                #datestring = stringbase.split("T")[0]
+                                #timestring = stringbase[:-5].split("T")[1]
+                                #datetimestring = f"{datestring}-{timestring}"
+                                #timeobj = datetime.strptime(datetimestring, '%Y-%m-%d-%H:%M:%S')#T%H:%M%S
+                                #epochtime = time.mktime(timeobj.timetuple())
                                 embedVar = discord.Embed(title=description, description=f"<t:{int(epochtime)}:R>", color=0x00ff00)
                                 embedVar.add_field(name="", value=f"[Link]({link})", inline=False)
                                 embedVar.set_image(url=news["imageLink"]) 
