@@ -370,6 +370,7 @@ async def alerts_Reset():
 @tasks.loop(minutes=30)
 async def invasions_Reset():
     response = requests.get("https://api.warframestat.us/pc/invasions")
+    imgprefix = "https://raw.githubusercontent.com/wfcd/warframe-items/master/data/img/"
     status = int(response.status_code)
     if status == 200:
         async with aiosqlite.connect("main2.db", timeout=30) as db:
@@ -402,7 +403,15 @@ async def invasions_Reset():
                                         attackreward = mission["attacker"]["reward"]["asString"]
                                     if "reward" in mission["defender"]:
                                         defendreward = mission["defender"]["reward"]["asString"]
-                                        defendimage = mission["defender"]["reward"]["thumbnail"]
+                                        if mission["rewardTypes"][0]  == "vandal" or mission["rewardTypes"][0]  == "wraith":
+                                            defendimage = str(thumbnailParse(defendreward))
+                                            defendimage = imgprefix +  defendimage + ".png"
+                                            status = requests.get(defendimage)
+                                            if int(status.status_code) != 200:
+                                                print(defendimage + "||| ERROR URL")
+                                                defendimage = mission["defender"]["reward"]["thumbnail"]
+                                        else:
+                                            defendimage = mission["defender"]["reward"]["thumbnail"]
                                     embedVar = discord.Embed(title=title, description=node, color=0xffa40d)
                                     if(attackreward != ""): embedVar.add_field(name="Attack Reward", value=attackreward, inline=True)
                                     if(defendreward != ""): embedVar.add_field(name="Defend Reward", value=defendreward, inline=True)
@@ -422,7 +431,15 @@ async def invasions_Reset():
                                     attackreward = mission["attacker"]["reward"]["asString"]
                                 if "reward" in mission["defender"]:
                                     defendreward = mission["defender"]["reward"]["asString"]
-                                    defendimage = mission["defender"]["reward"]["thumbnail"]
+                                    if mission["rewardTypes"][0] == "vandal" or mission["rewardTypes"][0]  == "wraith":
+                                        defendimage = str(thumbnailParse(defendreward))
+                                        defendimage = imgprefix +  defendimage + ".png"
+                                        status = requests.get(defendimage)
+                                        if int(status.status_code) != 200:
+                                            print(defendimage + "||| ERROR URL")
+                                            defendimage = mission["defender"]["reward"]["thumbnail"]
+                                    else:
+                                        defendimage = mission["defender"]["reward"]["thumbnail"]
                                 embedVar = discord.Embed(title=title, description=node, color=0xffa40d)
                                 if(attackreward != ""): embedVar.add_field(name="Attack Reward", value=attackreward, inline=True)
                                 if(defendreward != ""): embedVar.add_field(name="Defend Reward", value=defendreward, inline=True)
@@ -434,9 +451,19 @@ async def invasions_Reset():
         print("Invasions finished")
         
 
+def thumbnailParse(item):
+    defendrewardSplit = item.split(" ")[:-1]
+    defendrewardDash = ""
+    for x in defendrewardSplit:
+        defendrewardDash += x + "-"
+    defendrewardDash = defendrewardDash[:-1]
+    defendimage =  defendrewardDash.lower()
+    return defendimage
+
 @tasks.loop(minutes=30)
 async def events_Reset():
     response = requests.get("https://api.warframestat.us/pc/events")
+    imgprefix = "https://raw.githubusercontent.com/wfcd/warframe-items/master/data/img/"
     status = int(response.status_code)
     channel = 0
     if status == 200:
@@ -476,7 +503,13 @@ async def events_Reset():
                                 if(len(events["rewards"]) != 0):
                                     rewards = events["rewards"][0]["asString"]
                                 img = ""
-                                if events["rewards"][0]["thumbnail"] != "": img = events["rewards"][0]["thumbnail"]
+                                if events["rewards"][0]["thumbnail"] != "":
+                                    img = str(thumbnailParse(rewards))
+                                    img = imgprefix +  img + ".png"
+                                    status = requests.get(img)
+                                    if int(status.status_code) != 200:
+                                        print(img + "||| ERROR URL")
+                                        img = events["rewards"][0]["thumbnail"]
                                 end = f"<t:{int(epochtime)}:R>"
                                 embedVar = discord.Embed(title=description, description=f"", color=0xffff99)
                                 embedVar.add_field(name="Location", value=node, inline=False)
@@ -505,7 +538,14 @@ async def events_Reset():
                                 img = ""
                                 if(len(events["rewards"]) != 0):
                                     rewards = events["rewards"][0]["asString"]
-                                    if events["rewards"][0]["thumbnail"] != "": img = events["rewards"][0]["thumbnail"]
+                                    if events["rewards"][0]["thumbnail"] != "":
+                                        img = str(thumbnailParse(rewards))
+                                        img = imgprefix +  img + ".png"
+                                        status = requests.get(img)
+                                        if int(status.status_code) != 200:
+                                            print(img + "||| ERROR URL")
+                                            img = events["rewards"][0]["thumbnail"] 
+                                            img = events["rewards"][0]["thumbnail"]
                                 
                                 
                                 end = f"<t:{int(epochtime)}:R>"
