@@ -540,20 +540,20 @@ async def clearOldNews():
                     if data:
                         for x in data:
                             channel = data[0]
-                await cursor.execute('SELECT newsID, messageID FROM newsMessages WHERE guildID = ?', (guild.id,))
-                data = await cursor.fetchall()
-                for x in data:
-                    matchFound = False
-                    DBID = x[0]
+                    await cursor.execute('SELECT newsID, messageID FROM newsMessages WHERE guildID = ?', (guild.id,))
+                    data = await cursor.fetchall()
+                    for x in data:
+                        matchFound = False
+                        DBID = x[0]
 
-                    for news in response.json():
-                        if news["id"] == DBID:
-                            matchFound = True
-                    if not matchFound:
-                        message = await guild.get_channel(channel).fetch_message(x[1])
-                        await message.delete()
-                        await cursor.execute('DELETE FROM newsMessages WHERE newsID = ? AND messageID = ?', (DBID, x[1]))
-                        print("DELETED NEWS")
+                        for news in response.json():
+                            if news["id"] == DBID:
+                                matchFound = True
+                        if not matchFound:
+                            message = await guild.get_channel(channel).fetch_message(x[1])
+                            await message.delete()
+                            await cursor.execute('DELETE FROM newsMessages WHERE newsID = ? AND messageID = ?', (DBID, x[1]))
+                            print("DELETED NEWS")
             await db.commit()
         await db.close()
 
@@ -603,20 +603,20 @@ async def clearOldInvasions():
                     if data:
                         for x in data:
                             channel = data[0]
-                await cursor.execute('SELECT invasionsID, messageID FROM invasionsMessages WHERE guildID = ?', (guild.id,))
-                data = await cursor.fetchall()
-                for x in data:
-                    matchFound = False
-                    DBID = x[0]
+                    await cursor.execute('SELECT invasionsID, messageID FROM invasionsMessages WHERE guildID = ?', (guild.id,))
+                    data = await cursor.fetchall()
+                    for x in data:
+                        matchFound = False
+                        DBID = x[0]
 
-                    for invasions in response.json():
-                        if invasions["id"] == DBID and invasions["completed"] == False:
-                            matchFound = True
-                    if not matchFound:
-                        message = await guild.get_channel(channel).fetch_message(x[1])
-                        await message.delete()
-                        await cursor.execute('DELETE FROM invasionsMessages WHERE invasionsID = ? AND messageID = ?', (DBID, x[1]))
-                        print("DELETED invasions")
+                        for invasions in response.json():
+                            if invasions["id"] == DBID and invasions["completed"] == False:
+                                matchFound = True
+                        if not matchFound:
+                            message = await guild.get_channel(channel).fetch_message(x[1])
+                            await message.delete()
+                            await cursor.execute('DELETE FROM invasionsMessages WHERE invasionsID = ? AND messageID = ?', (DBID, x[1]))
+                            print("DELETED invasions")
             await db.commit()
         await db.close()
 
@@ -635,20 +635,20 @@ async def clearOldEvents():
                     if data:
                         for x in data:
                             channel = data[0]
-                await cursor.execute('SELECT eventsID, messageID FROM eventsMessages WHERE guildID = ?', (guild.id,))
-                data = await cursor.fetchall()
-                for x in data:
-                    matchFound = False
-                    DBID = x[0]
+                    await cursor.execute('SELECT eventsID, messageID FROM eventsMessages WHERE guildID = ?', (guild.id,))
+                    data = await cursor.fetchall()
+                    for x in data:
+                        matchFound = False
+                        DBID = x[0]
 
-                    for events in response.json():
-                        if events["id"] == DBID:
-                            matchFound = True
-                    if not matchFound:
-                        message = await guild.get_channel(channel).fetch_message(x[1])
-                        await message.delete()
-                        await cursor.execute('DELETE FROM eventsMessages WHERE eventsID = ? AND messageID = ?', (DBID, x[1]))
-                        print("DELETED events")
+                        for events in response.json():
+                            if events["id"] == DBID:
+                                matchFound = True
+                        if not matchFound:
+                            message = await guild.get_channel(channel).fetch_message(x[1])
+                            await message.delete()
+                            await cursor.execute('DELETE FROM eventsMessages WHERE eventsID = ? AND messageID = ?', (DBID, x[1]))
+                            print("DELETED events")
             await db.commit()
         await db.close()
 
