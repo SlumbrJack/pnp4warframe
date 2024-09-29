@@ -399,6 +399,24 @@ async def invasions_Reset():
                                     attackreward = ""
                                     defendreward = ""
                                     defendimage = ""
+
+                                    percent = str(mission["completion"])
+                                    percent = percent[:2] + "%"
+                                    inString = mission["eta"]
+                                    addtime = 0
+                                    timeList = inString.split(" ")
+                                    for x in timeList:
+                                        if x[-1] == 'd':
+                                            print(x)
+                                            addtime += (86400 * int(x[:-1]))
+                                        elif x[-1] == 'h':
+                                            addtime += (3600 * int(x[:-1]))
+                                        elif x[-1] == 'm':
+                                            addtime += (60 * int(x[:-1]))
+                                        else:
+                                            addtime += int(x[:-1])
+                                    epochtime = time.time() + addtime
+
                                     if "reward" in mission["attacker"]:
                                         attackreward = mission["attacker"]["reward"]["asString"]
                                     if "reward" in mission["defender"]:
@@ -415,6 +433,8 @@ async def invasions_Reset():
                                     embedVar = discord.Embed(title=title, description=node, color=0xffa40d)
                                     if(attackreward != ""): embedVar.add_field(name="Attack Reward", value=attackreward, inline=True)
                                     if(defendreward != ""): embedVar.add_field(name="Defend Reward", value=defendreward, inline=True)
+                                    embedVar.add_field(name="Completion", value=percent, inline=False)
+                                    embedVar.add_field(name="Ends", value=f"<t:{int(epochtime)}:R>", inline=True)
                                     embedVar.set_image(url=defendimage) 
                                     message = await guild.get_channel(channel).send(embeds=[embedVar],silent=True)
                                     await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
@@ -427,6 +447,23 @@ async def invasions_Reset():
                                 attackreward = ""
                                 defendreward = ""
                                 defendimage = ""
+
+                                percent = str(mission["completion"])
+                                percent = percent[:2] + "%"
+                                inString = mission["eta"]
+                                addtime = 0
+                                timeList = inString.split(" ")
+                                for x in timeList:
+                                    if x[-1] == 'd':
+                                        addtime += (86400 * int(x[:-1]))
+                                    elif x[-1] == 'h':
+                                        addtime += (3600 * int(x[:-1]))
+                                    elif x[-1] == 'm':
+                                        addtime += (60 * int(x[:-1]))
+                                    else:
+                                        addtime += int(x[:-1])
+                                epochtime = time.time() + addtime           
+
                                 if "reward" in mission["attacker"]:
                                     attackreward = mission["attacker"]["reward"]["asString"]
                                 if "reward" in mission["defender"]:
@@ -443,6 +480,8 @@ async def invasions_Reset():
                                 embedVar = discord.Embed(title=title, description=node, color=0xffa40d)
                                 if(attackreward != ""): embedVar.add_field(name="Attack Reward", value=attackreward, inline=True)
                                 if(defendreward != ""): embedVar.add_field(name="Defend Reward", value=defendreward, inline=True)
+                                embedVar.add_field(name="Completion", value=percent, inline=False)
+                                embedVar.add_field(name="Ends", value=f"<t:{int(epochtime)}:R>", inline=True)
                                 embedVar.set_image(url=defendimage) 
                                 message = await guild.get_channel(channel).send(embeds=[embedVar],silent=True)
                                 await cursor.execute('INSERT INTO invasionsMessages (guildID, channelID, messageID, invasionsID) VALUES (?,?,?,?)', (guild.id, channel, message.id, jsoninvasionsID ))
